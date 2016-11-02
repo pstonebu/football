@@ -1,9 +1,7 @@
 package main.java.com.stoneburner.app;
 
-import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.HttpResponse;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DecompressingHttpClient;
@@ -15,22 +13,15 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import org.simmetrics.StringMetric;
-import org.simmetrics.metrics.StringMetrics;
 import org.unbescape.html.HtmlEscape;
 
-import javax.crypto.KeyGenerator;
-import javax.script.ScriptEngineManager;
 import javax.script.ScriptEngine;
-
+import javax.script.ScriptEngineManager;
 import java.io.*;
 import java.net.URLEncoder;
-import java.security.Key;
-import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Locale;
-import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
