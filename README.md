@@ -1,4 +1,4 @@
-httpclient
+Football
 ==========
 
-Simple httpclient to fetch a URL and return status code
+Grabs the HTML from various football prediction web sites, parses them for their predictions, and outputs to a csv file
