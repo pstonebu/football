@@ -27,8 +27,8 @@ import java.util.regex.Pattern;
 
 public class NCAAMain
 {
-    //Home  Away    PR  DR  Fox  OS S&P+    Massey  Sagarin 538 Spread
-    public static String[][] predictions = new String[100][11];
+    //Home  Away    PR  DR  Fox  OS S&P+    Massey  Sagarin 538 Atomic  Spread
+    public static String[][] predictions = new String[100][12];
     public static int week;
     public static int numGames = 0;
     public static String inputURIPR = "https://thepowerrank.com/predictions/";
@@ -40,6 +40,7 @@ public class NCAAMain
     public static String inputMassey = "http://www.masseyratings.com/predjson.php?s=cf&sub=11604&dt=$dt$";
     public static String inputSpread = "http://www.vegasinsider.com/college-football/odds/offshore/2/";
     public static String input538 = "http://projects.fivethirtyeight.com/2016-college-football-predictions/sims.csv";
+    public static String inputAtomic = "http://www.al.com/atomic-football/atfo_cf_predictions_FBS.html";
 
     public static void main( String[] args )
     {
@@ -53,6 +54,7 @@ public class NCAAMain
         inputMassey = inputMassey.replace("$dt$", dtfOut.print(today));
 
         grabPowerRank();
+        grabAtomic();
         grab538();
         grabSpread();
         grabSagarin();
@@ -642,7 +644,7 @@ public class NCAAMain
                     double awayResult =  similarity(predictions[j][1], teamOne);
                     if (homeResult == 1 || awayResult == 1) {
                         actualRow = j;
-                        predictions[actualRow][10] = String.valueOf(spread);
+                        predictions[actualRow][11] = String.valueOf(spread);
                         //maybe the two are reversed?
                     } else {
                         homeResult =  similarity(predictions[j][0], teamOne);
@@ -654,14 +656,14 @@ public class NCAAMain
                             teamTwo = third;
                             spread = spread * -1.0;
                             actualRow = j;
-                            predictions[actualRow][10] = String.valueOf(spread);
+                            predictions[actualRow][11] = String.valueOf(spread);
                         }
                     }
                 }
                 if (actualRow < 0) {
-                    actualRow = askForRow(10, teamOne, teamTwo);
+                    actualRow = askForRow(11, teamOne, teamTwo);
                     if (actualRow >= 0) {
-                        predictions[actualRow][10] = String.valueOf(spread);
+                        predictions[actualRow][11] = String.valueOf(spread);
                     }
                 }
             }
@@ -737,6 +739,79 @@ public class NCAAMain
         }
     }
 
+    public static void grabAtomic() {
+        System.out.println("Fetching '" + inputAtomic + "'");
+
+        //Instantiate client and method
+        HttpClient client = new DecompressingHttpClient();
+        HttpGet method = new HttpGet(inputAtomic);
+
+        //Execute client with our method
+        try {
+
+            HttpResponse response = client.execute(method);
+
+            String source = EntityUtils.toString(response.getEntity());
+            String[] rows = source.replaceAll("\r","").replaceAll("\n","").split("<table class=\"atfoTable\" cellspacing=\"1\">")[1].split("</table>")[0].split("<tr class=\"");
+            rows = Arrays.copyOfRange(rows, 3, rows.length);
+
+            DateTime currentDate = new DateTime();
+            DateTime thisPastMonday = new DateTime().withWeekyear(currentDate.getWeekyear()).withYear(2016).withDayOfWeek(1).withHourOfDay(0);
+            DateTime inAWeek = thisPastMonday.plusWeeks(1);
+
+            for (String row : rows) {
+                String[] elements = row.split("<td class=\"atfoCent\">");
+                String date = elements[1].split("</td>")[0];
+                String away = cleanTeamName(elements[2].split("</td>")[0]);
+                String home = cleanTeamName(elements[4].split("</td>")[0]);
+                String awayScore = elements[3].split("</td>")[0];
+                String homeScore = elements[5].split("</td>")[0];
+                String margin = String.valueOf(Integer.valueOf(awayScore) - Integer.valueOf(homeScore));
+
+                DateTimeFormatter format = DateTimeFormat.forPattern("MM/dd");
+                DateTime gameDate = format.withLocale(Locale.ENGLISH).parseDateTime(date).withYear(thisPastMonday.getYear()).withHourOfDay(22);
+
+                if (gameDate.getMillis() < thisPastMonday.getMillis() || gameDate.getMillis() > inAWeek.getMillis()) {
+                    break;
+                }
+
+                //Find a spot in our array for these values
+                int actualRow = -1;
+                for (int j = 0; j < numGames; j++) {
+                    double homeResult =  similarity(predictions[j][0], home);
+                    double awayResult =  similarity(predictions[j][1], away);
+                    if (homeResult == 1 || awayResult == 1) {
+                        actualRow = j;
+                        predictions[actualRow][10] = margin;
+                        //maybe the two are reversed?
+                    } else {
+                        homeResult =  similarity(predictions[j][0], away);
+                        awayResult =  similarity(predictions[j][1], home);
+
+                        if (homeResult == 1 || awayResult == 1) {
+                            String third = home;
+                            home = away;
+                            away = third;
+                            margin = String.valueOf(Integer.valueOf(margin) * -1);
+                            actualRow = j;
+                            predictions[actualRow][10] = String.valueOf(margin);
+                        }
+                    }
+                }
+                if (actualRow < 0) {
+                    actualRow = askForRow(10, home, away);
+                    if (actualRow >= 0) {
+                        predictions[actualRow][10] = margin;
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            System.exit(0);
+        }
+    }
+
     public static int askForRow(int column, String...args) {
         BufferedReader br = null;
 
@@ -775,7 +850,8 @@ public class NCAAMain
 
     public static String cleanTeamName(String teamName) {
         return teamName.replaceAll(" St$"," State").replaceFirst("E ", "Eastern ").replaceFirst("C ", "Central ").replace("&amp;","&")
-                .replace("FL ", "Florida ").replaceAll("Intl$", "International").replace("FIU","Florida International").replaceAll(" St.$"," State").trim();
+                .replace("FL ", "Florida ").replaceAll("Intl$", "International").replace("FIU","Florida International")
+                .replaceAll(" St.$"," State").replace("<b>","").replace("</b>","").trim();
     }
 
     public static void printResults() {
@@ -789,11 +865,11 @@ public class NCAAMain
 
             FileWriter fw1 = new FileWriter(file);
             bw = new BufferedWriter(fw1);
-            bw.write("Home Team, Away Team, PR, Dratings, Fox, OS, S&P+, Massey, Sagarin, 538, Spread");
+            bw.write("Home Team, Away Team, PR, Dratings, Fox, OS, S&P+, Massey, Sagarin, 538, Atomic, Spread");
             bw.newLine();
 
             for (int i = 0; i < numGames; i++) {
-                bw.write(String.format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", predictions[i][0], predictions[i][1],
+                bw.write(String.format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", predictions[i][0], predictions[i][1],
                         predictions[i][2] != null ? predictions[i][2] : "",
                         predictions[i][3] != null ? predictions[i][3] : "",
                         predictions[i][4] != null ? predictions[i][4] : "",
@@ -802,7 +878,8 @@ public class NCAAMain
                         predictions[i][7] != null ? predictions[i][7] : "",
                         predictions[i][8] != null ? predictions[i][8] : "",
                         predictions[i][9] != null ? predictions[i][9] : "",
-                        predictions[i][10] != null ? predictions[i][10] : ""));
+                        predictions[i][10] != null ? predictions[i][10] : "",
+                        predictions[i][11] != null ? predictions[i][11] : ""));
                 bw.newLine();
             }
 
