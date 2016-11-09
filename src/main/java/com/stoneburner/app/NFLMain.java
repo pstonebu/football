@@ -150,7 +150,7 @@ public class NFLMain
             HttpResponse response = client.execute(method);
 
             String source = EntityUtils.toString(response.getEntity());
-            source = source.split("<h2>National Football League, Week [0-9]</h2")[1];
+            source = source.split("<h2>National Football League, Week [0-9]+</h2")[1];
             String[] games = Arrays.copyOfRange(source.split("<strong>"), 1, source.split("<strong>").length);
 
             //for (String game : games) {

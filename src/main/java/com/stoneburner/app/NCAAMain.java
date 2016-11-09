@@ -85,8 +85,8 @@ public class NCAAMain
             HttpResponse response = client.execute(method);
 
             String source = EntityUtils.toString(response.getEntity());
-            source = source.split("<h2>College Football, Week [0-9]*</h2>")[1];
-            source = source.split("<h2>National Football League, Week [0-9]</h2")[0];
+            source = source.split("<h2>College Football, Week [0-9]+</h2>")[1];
+            source = source.split("<h2>National Football League, Week [0-9]+</h2")[0];
             String[] games = Arrays.copyOfRange(source.split("<strong>"), 1, source.split("<strong>").length);
 
             //for (String game : games) {
@@ -514,8 +514,10 @@ public class NCAAMain
 
             String html = EntityUtils.toString(response.getEntity());
 
-            String[] rows = Arrays.copyOfRange(html.split("<a name=\"New_Feature\"><b>New_Feature</b></a></h2></font>")[1].split("\r\n"),
-                    5, html.split("<a name=\"New_Feature\"><b>New_Feature</b></a></h2></font>")[1].split("\r\n").length-2);
+            String picks = html.split("<a href=\"#New_Feature\"><b>New_Feature</b></a></h2></font>")[1].split("</pre>")[0];
+
+            String[] rows = Arrays.copyOfRange(picks.split("\r\n"),
+                    5, picks.split("\r\n").length-2);
 
             for (int i = 0; i < numGames; i++) {
                 String home = predictions[i][0];
@@ -585,7 +587,7 @@ public class NCAAMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            System.out.println("Exception occurred: " + e);
             System.exit(0);
         }
     }
@@ -771,7 +773,9 @@ public class NCAAMain
                 DateTimeFormatter format = DateTimeFormat.forPattern("MM/dd");
                 DateTime gameDate = format.withLocale(Locale.ENGLISH).parseDateTime(date).withYear(thisPastMonday.getYear()).withHourOfDay(22);
 
-                if (gameDate.getMillis() < thisPastMonday.getMillis() || gameDate.getMillis() > inAWeek.getMillis()) {
+                if (gameDate.getMillis() < thisPastMonday.getMillis()) {
+                    continue;
+                } else if (gameDate.getMillis() > inAWeek.getMillis()) {
                     break;
                 }
 
@@ -851,7 +855,7 @@ public class NCAAMain
     public static String cleanTeamName(String teamName) {
         return teamName.replaceAll(" St$"," State").replaceFirst("E ", "Eastern ").replaceFirst("C ", "Central ").replace("&amp;","&")
                 .replace("FL ", "Florida ").replaceAll("Intl$", "International").replace("FIU","Florida International")
-                .replaceAll(" St.$"," State").replace("<b>","").replace("</b>","").trim();
+                .replaceAll(" St.$"," State").replace("<b>","").replace("</b>","").replaceFirst("W ", "Western ").replaceFirst("Ga ", "Georgia ").trim();
     }
 
     public static void printResults() {
