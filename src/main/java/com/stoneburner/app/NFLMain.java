@@ -539,7 +539,7 @@ public class NFLMain
 
             String html = EntityUtils.toString(response.getEntity());
 
-            String[] rows = Arrays.copyOfRange(html.split("<a href=\"#New_Feature\"><b>New_Feature</b></a></h2></font>")[1].split("\r\n"),
+            String[] rows = Arrays.copyOfRange(html.split("<a name=\"New_Feature\"><b>New_Feature</b></a></h2></font>")[1].split("\r\n"),
                     5, numGames+5);
 
             for (int i = 0; i < numGames; i++) {
@@ -651,7 +651,8 @@ public class NFLMain
 
                 String [] spreadParts;
                 try {
-                    spreadParts = Arrays.copyOfRange(HtmlEscape.unescapeHtml(firstRow.split("<a class=\"cellTextNorm\" href=\"")[firstRow.split("<a class=\"cellTextNorm\" href=\"").length - 1]
+                    spreadParts = Arrays.copyOfRange(HtmlEscape.unescapeHtml(firstRow.split("<a class=\"cellTextNorm\" href=\"|<a class=\"cellTextHot\" href=\"")
+                            [firstRow.split("<a class=\"cellTextNorm\" href=\"|<a class=\"cellTextHot\" href=\"").length - 1]
                             .split("_blank\">")[1].split("</a>")[0]).split("<br>"), 1, 3);
                 } catch (IndexOutOfBoundsException ex) {
                     continue;

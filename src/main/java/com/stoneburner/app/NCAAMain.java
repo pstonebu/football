@@ -40,7 +40,7 @@ public class NCAAMain
     public static String inputMassey = "http://www.masseyratings.com/predjson.php?s=cf&sub=11604&dt=$dt$";
     public static String inputSpread = "http://www.vegasinsider.com/college-football/odds/offshore/2/";
     public static String input538 = "http://projects.fivethirtyeight.com/2016-college-football-predictions/sims.csv";
-    public static String inputAtomic = "http://www.al.com/atomic-football/atfo_cf_predictions_FBS.html";
+    public static String inputAtomic = "http://www.atomicfootball.com/archive/af_predictions_All.html";
 
     public static void main( String[] args )
     {
@@ -514,7 +514,7 @@ public class NCAAMain
 
             String html = EntityUtils.toString(response.getEntity());
 
-            String picks = html.split("<a href=\"#New_Feature\"><b>New_Feature</b></a></h2></font>")[1].split("</pre>")[0];
+            String picks = html.split("<a name=\"New_Feature\"><b>New_Feature</b></a>")[1].split("</pre>")[0];
 
             String[] rows = Arrays.copyOfRange(picks.split("\r\n"),
                     5, picks.split("\r\n").length-2);
@@ -612,12 +612,12 @@ public class NCAAMain
                 String teamOne = null;
 
                 try {
-                    teamOne = firstRow.split("<a href=\"")[1].split(">")[1].split("</a")[0];
+                    teamOne = cleanTeamName(firstRow.split("<a href=\"")[1].split(">")[1].split("</a")[0]);
                 } catch (IndexOutOfBoundsException e) {
                     i = i - 3;
                     continue;
                 }
-                String teamTwo = firstRow.split("<a href=\"")[2].split(">")[1].split("</a")[0];
+                String teamTwo = cleanTeamName(firstRow.split("<a href=\"")[2].split(">")[1].split("</a")[0]);
 
                 String [] spreadParts;
                 try {
@@ -629,7 +629,10 @@ public class NCAAMain
 
                 boolean teamOneIsFavorite;
                 double spread = 0.0;
-                if (spreadParts[0].startsWith("-")) {
+                if (spreadParts[0] == null) {
+                    continue;
+                }
+                else if (spreadParts[0].startsWith("-")) {
                     teamOneIsFavorite = true;
                     String spreadString = spreadParts[0].split("-|\\+|EV")[1].replace("½", ".5").replace(" EV", "");
                     spread = Double.valueOf(spreadString.substring(0, spreadString.length()-1));
@@ -706,7 +709,7 @@ public class NCAAMain
             }
             for (String teamName : teams.keySet()) {
                 int wins = teams.get(teamName);
-                Double winPct = teams.get(teamName) / 100.0;
+                Double winPct = teams.get(teamName) * 100.0 / ((rows.length-1 * 1.0) / teams.size());
                 Double spread = null;
                 if (winPct < 50.0) {
                     winPct = 100.0 - winPct;
@@ -754,18 +757,18 @@ public class NCAAMain
             HttpResponse response = client.execute(method);
 
             String source = EntityUtils.toString(response.getEntity());
-            String[] rows = source.replaceAll("\r","").replaceAll("\n","").split("<table class=\"atfoTable\" cellspacing=\"1\">")[1].split("</table>")[0].split("<tr class=\"");
-            rows = Arrays.copyOfRange(rows, 3, rows.length);
+            String[] rows = source.replaceAll("\r","").replaceAll("\n","").split("<h2>FBS</h2>")[1].trim().split("</table>")[0].split("<tr>|<tr bgcolor=\"#edf3fe\">");
+            rows = Arrays.copyOfRange(rows, 1, rows.length);
 
             DateTime currentDate = new DateTime();
             DateTime thisPastMonday = new DateTime().withWeekyear(currentDate.getWeekyear()).withYear(2016).withDayOfWeek(1).withHourOfDay(0);
             DateTime inAWeek = thisPastMonday.plusWeeks(1);
 
             for (String row : rows) {
-                String[] elements = row.split("<td class=\"atfoCent\">");
+                String[] elements = row.split("<td>|<td align=\"left\">");
                 String date = elements[1].split("</td>")[0];
-                String away = cleanTeamName(elements[2].split("</td>")[0]);
-                String home = cleanTeamName(elements[4].split("</td>")[0]);
+                String away = cleanTeamName(elements[2].split(">")[1].split("</a")[0]);
+                String home = cleanTeamName(elements[4].split(">")[1].split("</a")[0]);
                 String awayScore = elements[3].split("</td>")[0];
                 String homeScore = elements[5].split("</td>")[0];
                 String margin = String.valueOf(Integer.valueOf(awayScore) - Integer.valueOf(homeScore));
@@ -853,9 +856,9 @@ public class NCAAMain
     }
 
     public static String cleanTeamName(String teamName) {
-        return teamName.replaceAll(" St$"," State").replaceFirst("E ", "Eastern ").replaceFirst("C ", "Central ").replace("&amp;","&")
-                .replace("FL ", "Florida ").replaceAll("Intl$", "International").replace("FIU","Florida International")
-                .replaceAll(" St.$"," State").replace("<b>","").replace("</b>","").replaceFirst("W ", "Western ").replaceFirst("Ga ", "Georgia ").trim();
+        return teamName.replaceAll(" St$"," State").replaceFirst("E ", "Eastern ").replaceFirst("^C ", "Central ").replace("&amp;","&")
+                .replace("FL ", "Florida ").replaceAll("Intl$", "International").replace("FIU","Florida International").replace("AM","A&M").replace("NC ", "North Carolina ")
+                .replaceAll(" St.$"," State").replace("<b>","").replace("</b>","").replaceFirst("^W ", "Western ").replaceFirst("^Ga ", "Georgia ").trim();
     }
 
     public static void printResults() {
