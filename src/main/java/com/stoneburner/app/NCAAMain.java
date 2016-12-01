@@ -85,7 +85,7 @@ public class NCAAMain
             HttpResponse response = client.execute(method);
 
             String source = EntityUtils.toString(response.getEntity());
-            source = source.split("<h2>College Football, Week [0-9]+</h2>")[1];
+            source = source.split("<h2>College Football, Week [0-9]+</h2>|<h2>College Football, Championship Week</h2>")[1];
             source = source.split("<h2>National Football League, Week [0-9]+</h2")[0];
             String[] games = Arrays.copyOfRange(source.split("<strong>"), 1, source.split("<strong>").length);
 
@@ -311,8 +311,8 @@ public class NCAAMain
 
             for (int i = 0; i < rows.length; i++) {
                 String current = rows[i];
-                String away = current.split("<caption>")[1].split("<a href=")[0].trim();
-                String home = current.split("</a>")[1].split("</caption")[0].trim();
+                String away = cleanTeamName(current.split("<caption>")[1].split("<a href=")[0].trim());
+                String home = cleanTeamName(current.split("</a>")[1].split("</caption")[0].trim());
                 String prediction = current.split("Predicted Score</td><td>")[1].split("</td>")[0];
 
                 ScriptEngineManager mgr = new ScriptEngineManager();
@@ -858,7 +858,9 @@ public class NCAAMain
     public static String cleanTeamName(String teamName) {
         return teamName.replaceAll(" St$"," State").replaceFirst("E ", "Eastern ").replaceFirst("^C ", "Central ").replace("&amp;","&")
                 .replace("FL ", "Florida ").replaceAll("Intl$", "International").replace("FIU","Florida International").replace("AM","A&M").replace("NC ", "North Carolina ")
-                .replaceAll(" St.$"," State").replace("<b>","").replace("</b>","").replaceFirst("^W ", "Western ").replaceFirst("^Ga ", "Georgia ").trim();
+                .replaceAll(" St.$"," State").replace("<b>","").replace("</b>","").replaceFirst("^W ", "Western ").replaceFirst("^Ga ", "Georgia ")
+                .replace("N Illinois","Northern Illinois").replace("Kent","Kent State").replaceAll("^ULM$","Louisiana Monroe").replaceAll("^ULL$","Louisiana Lafayette")
+                .replace("Louisiana-Monroe", "Louisiana Monroe").replace("Louisiana-Lafayette", "Louisiana Lafayette").trim();
     }
 
     public static void printResults() {
