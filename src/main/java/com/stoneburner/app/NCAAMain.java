@@ -709,6 +709,9 @@ public class NCAAMain
             }
             for (String teamName : teams.keySet()) {
                 int wins = teams.get(teamName);
+                if (wins == 0) {
+                    continue;
+                }
                 Double winPct = teams.get(teamName) * 100.0 / ((rows.length-1 * 1.0) / teams.size());
                 Double spread = null;
                 if (winPct < 50.0) {
