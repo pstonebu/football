@@ -4,13 +4,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.conn.scheme.Scheme;
-import org.apache.http.conn.scheme.SchemeRegistry;
-import org.apache.http.conn.ssl.SSLSocketFactory;
-import org.apache.http.conn.ssl.X509HostnameVerifier;
-import org.apache.http.impl.client.DecompressingHttpClient;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.impl.conn.SingleClientConnManager;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 import org.joda.time.DateTime;
 import org.joda.time.Weeks;
@@ -18,6 +12,7 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -26,20 +21,15 @@ import org.jsoup.nodes.TextNode;
 import org.jsoup.select.Elements;
 import org.unbescape.html.HtmlEscape;
 
-import javax.net.ssl.HostnameVerifier;
-import javax.net.ssl.HttpsURLConnection;
-
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import java.io.*;
-import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
+import static java.net.URLEncoder.encode;
 import static java.util.stream.Collectors.toList;
 
 public class NCAAMain
@@ -233,25 +223,18 @@ public class NCAAMain
     public static void grabOddsShark() {
         System.out.println( "Fetching '" + inputURIOS + "'");
 
-        //Instantiate client and method
-        HttpClient client = new DefaultHttpClient();
-        HttpGet method = new HttpGet(inputURIOS);
-
-        //Execute client with our method
         try
         {
-            HttpResponse response = client.execute(method);
+            Document page = Jsoup.connect(inputURIOS).get();
+            Elements games = page.select("table");
 
-            String source = EntityUtils.toString(response.getEntity());
-            String[] allRows = source.split("<div class=\"region region-content\"><div id=\"block-system-main\" class=\"block block-system\"><div class=\"content\">")[1]
-                    .split("<table class=\"base-table\">");
-            String[] rows = Arrays.copyOfRange(allRows, 1, allRows.length-1);
-
-            for (int i = 0; i < rows.length; i++) {
-                String current = rows[i];
-                String away = cleanTeamName(current.split("<caption>")[1].split("<a href=")[0].trim());
-                String home = cleanTeamName(current.split("</a>")[1].split("</caption")[0].trim());
-                String prediction = current.split("Predicted Score</td><td>")[1].split("</td>")[0];
+            for (int i = 0; i < numGames-1; i++) {
+                Element game = games.get(i);
+                List<Node> teams = game.select("caption")
+                        .get(0).select("caption").get(0).childNodes();
+                String away = teams.get(0).toString().trim();
+                String home = teams.get(2).toString().trim();
+                String prediction = game.select("td").get(1).childNode(0).toString();
 
                 ScriptEngineManager mgr = new ScriptEngineManager();
                 ScriptEngine engine = mgr.getEngineByName("JavaScript");
@@ -271,7 +254,8 @@ public class NCAAMain
                     if (homeResult == 1 || awayResult == 1) {
                         actualRow = j;
                         predictions[actualRow][5] = String.valueOf(margin);
-                    //maybe the two are reversed?
+                        break;
+                        //maybe the two are reversed?
                     } else {
                         homeResult =  similarity(predictions[j][0], away);
                         awayResult =  similarity(predictions[j][1], home);
@@ -283,6 +267,7 @@ public class NCAAMain
                             margin = margin * -1.0;
                             actualRow = j;
                             predictions[actualRow][5] = String.valueOf(margin);
+                            break;
                         }
                     }
                 }
@@ -293,7 +278,6 @@ public class NCAAMain
                     }
                 }
             }
-
         }
 
         catch (Exception e) {
@@ -308,62 +292,53 @@ public class NCAAMain
         for (int i = 0; i < numGames; i++) {
             String homeTeam = predictions[i][0];
             String awayTeam = predictions[i][1];
-            String homeUrl = inputSP.replaceAll("%team%", URLEncoder.encode(homeTeam.toLowerCase()).replace("+","-"));
-            String awayUrl = inputSP.replaceAll("%team%", URLEncoder.encode(awayTeam.toLowerCase()).replace("+","-"));
+            String homeUrl;
+            String awayUrl;
+            try {
+                homeUrl = inputSP.replaceAll("%team%", encode(homeTeam.toLowerCase(), "UTF-8").replace("+", "-"));
+                awayUrl = inputSP.replaceAll("%team%", encode(awayTeam.toLowerCase(), "UTF-8").replace("+", "-"));
+            } catch (UnsupportedEncodingException e) {
+                break;
+            }
+
             System.out.println("Fetching '" + (homeTeamFailure ? awayUrl : homeUrl) + "'");
 
-            //Instantiate client and method
-            HostnameVerifier hostnameVerifier = org.apache.http.conn.ssl.SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER;
-
-            DefaultHttpClient client = new DefaultHttpClient();
-
-            SchemeRegistry registry = new SchemeRegistry();
-            SSLSocketFactory socketFactory = SSLSocketFactory.getSocketFactory();
-            socketFactory.setHostnameVerifier((X509HostnameVerifier) hostnameVerifier);
-            registry.register(new Scheme("https", socketFactory, 443));
-            SingleClientConnManager mgr = new SingleClientConnManager(client.getParams(), registry);
-            DefaultHttpClient httpClient = new DefaultHttpClient(mgr, client.getParams());
-
-            // Set verifier
-            HttpsURLConnection.setDefaultHostnameVerifier(hostnameVerifier);
-
-            HttpGet method = new HttpGet(homeTeamFailure ? awayUrl : homeUrl);
-
-            //Execute client with our method
             try {
-                HttpResponse response = httpClient.execute(method);
-                if (response.getStatusLine().getStatusCode() >= 300) {
-                    if (!homeTeamFailure) {
-                        --i;
+                Document page = null;
+                try {
+                    page = Jsoup.connect(homeTeamFailure ? awayUrl : homeUrl).get();
+                } catch (HttpStatusException ex) {
+                    if (ex.getStatusCode() >= 300) {
+                        if (!homeTeamFailure) {
+                            --i;
+                        }
+                        homeTeamFailure = !homeTeamFailure;
+                        continue;
                     }
-                    homeTeamFailure = !homeTeamFailure;
-                    continue;
                 }
-                String source = EntityUtils.toString(response.getEntity());
 
-                String[] tables = source.split("<table border=\"1\"");
-                String predictionTable = tables[2].replaceAll("\\r","").replaceAll("\\n","");
-                if (!predictionTable.contains("Cumulative")) {
-                    System.out.println("The third table didn't look like the predictions table, continuing on.");
+                Element predictionTable = page.select("table").get(1);
+                if (!predictionTable.toString().contains("Cumulative")) {
+                    System.out.println("The second table didn't look like the predictions table, continuing on.");
                     continue;
                 }
 
-                for (int j = 2; j < predictionTable.split("<tr>").length; j++) {
+                Elements predictionsRows = predictionTable.select("tr");
+                for (int j = 1; j < predictionsRows.size()+1; j++) {
+                    Element currentPrediction = predictionsRows.get(j);
                     DateTime currentDate = new DateTime();
-                    DateTime thisPastMonday = new DateTime().withWeekyear(currentDate.getWeekyear()).withYear(2016).withDayOfWeek(1).withHourOfDay(0);
+                    DateTime thisPastMonday = new DateTime().withWeekyear(currentDate.getWeekyear()).withYear(2017).withDayOfWeek(1).withHourOfDay(0);
                     DateTime inAWeek = thisPastMonday.plusWeeks(1);
 
-                    String nextPredictionRow = predictionTable.split("<tr>")[j];
-                    String nextGameDate = nextPredictionRow.split("<td>")[1].split("</td>")[0];
-
+                    String nextGameString = currentPrediction.select("td").get(0).childNode(0).toString();
                     DateTimeFormatter format = DateTimeFormat.forPattern("d-MMM");
-                    DateTime gameDate = format.withLocale(Locale.ENGLISH).parseDateTime(nextGameDate).withYear(thisPastMonday.getYear()).withHourOfDay(22);
+                    DateTime gameDate = format.withLocale(Locale.ENGLISH).parseDateTime(nextGameString).withYear(thisPastMonday.getYear()).withHourOfDay(22);
 
                     if (gameDate.getMillis() < thisPastMonday.getMillis() || gameDate.getMillis() > inAWeek.getMillis()) {
                         System.out.println("Something weird with the next game date. Continuing.");
                         continue;
                     } else {
-                        String spread = nextPredictionRow.split("<td align=\"center\">")[4].replaceAll("</td>","");
+                        String spread = currentPrediction.select("td").get(5).childNode(0).toString();
                         if (!homeTeamFailure) {
                             spread = "-" + spread;
                         }
@@ -372,7 +347,6 @@ public class NCAAMain
                         break;
                     }
                 }
-
 
             } catch (Exception e) {
                 System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
@@ -384,7 +358,7 @@ public class NCAAMain
         System.out.println( "Fetching '" + inputMassey + "'");
 
         //Instantiate client and method
-        HttpClient client = new DefaultHttpClient();
+        HttpClient client = HttpClientBuilder.create().build();
         HttpGet method = new HttpGet(inputMassey);
 
         //Execute client with our method
@@ -454,21 +428,12 @@ public class NCAAMain
     public static void grabSagarin() {
         System.out.println( "Fetching '" + inputSagarin + "'");
 
-        //Instantiate client and method
-        HttpClient client = new DefaultHttpClient();
-        HttpGet method = new HttpGet(inputSagarin);
-
-        //Execute client with our method
         try
         {
-            HttpResponse response = client.execute(method);
-
-            String html = EntityUtils.toString(response.getEntity());
-
-            String picks = html.split("<a name=\"New_Feature\"><b>New_Feature</b></a>")[1].split("</pre>")[0];
-
-            String[] rows = Arrays.copyOfRange(picks.split("\r\n"),
-                    7, picks.split("\r\n").length);
+            Document page = Jsoup.connect(inputSagarin).get();
+            Node predictionSection = page.select("a[name=New_Feature]").get(0).parent().parent().parent().childNode(2);
+            String[] rows = Arrays.copyOfRange(predictionSection.toString().split("\r\n"), 7,
+                    predictionSection.toString().split("\r\n").length);
 
             for (int i = 0; i < numGames; i++) {
                 String home = predictions[i][0];
@@ -592,7 +557,7 @@ public class NCAAMain
                         double awayResult = similarity(predictions[j][1], teamOne);
                         if (homeResult == 1 || awayResult == 1) {
                             actualRow = j;
-                            predictions[actualRow][9] = String.valueOf(spread);
+                            predictions[actualRow][11] = String.valueOf(spread);
                             break;
                             //maybe the two are reversed?
                         } else {
@@ -605,7 +570,7 @@ public class NCAAMain
                                 teamTwo = third;
                                 spread = spread * -1.0;
                                 actualRow = j;
-                                predictions[actualRow][9] = String.valueOf(spread);
+                                predictions[actualRow][11] = String.valueOf(spread);
                                 break;
                             }
                         }
@@ -613,7 +578,7 @@ public class NCAAMain
                     if (actualRow < 0) {
                         actualRow = askForRow(9, teamOne, teamTwo);
                         if (actualRow >= 0) {
-                            predictions[actualRow][9] = String.valueOf(spread);
+                            predictions[actualRow][11] = String.valueOf(spread);
                         }
                     }
                 }
@@ -630,7 +595,7 @@ public class NCAAMain
         System.out.println("Fetching '" + input538 + "'");
 
         //Instantiate client and method
-        HttpClient client = new DecompressingHttpClient();
+        HttpClient client = HttpClientBuilder.create().build();
         HttpGet method = new HttpGet(input538);
 
         //Execute client with our method
@@ -696,30 +661,21 @@ public class NCAAMain
     public static void grabAtomic() {
         System.out.println("Fetching '" + inputAtomic + "'");
 
-        //Instantiate client and method
-        HttpClient client = new DecompressingHttpClient();
-        HttpGet method = new HttpGet(inputAtomic);
-
-        //Execute client with our method
         try {
 
-            HttpResponse response = client.execute(method);
-
-            String source = EntityUtils.toString(response.getEntity());
-            String[] rows = source.replaceAll("\r","").replaceAll("\n","").split("<h2>FBS</h2>")[1].trim().split("</table>")[0].split("<tr>|<tr bgcolor=\"#edf3fe\">");
-            rows = Arrays.copyOfRange(rows, 1, rows.length);
-
+            Document page = Jsoup.connect(inputAtomic).get();
+            Elements rows = page.select("a[name=IA]").get(0).nextElementSibling().nextElementSibling().select("tr");
             DateTime currentDate = new DateTime();
-            DateTime thisPastMonday = new DateTime().withWeekyear(currentDate.getWeekyear()).withYear(2016).withDayOfWeek(1).withHourOfDay(0);
+            DateTime thisPastMonday = new DateTime().withWeekyear(currentDate.getWeekyear()).withYear(2017).withDayOfWeek(1).withHourOfDay(0);
             DateTime inAWeek = thisPastMonday.plusWeeks(1);
 
-            for (String row : rows) {
-                String[] elements = row.split("<td>|<td align=\"left\">");
-                String date = elements[1].split("</td>")[0];
-                String away = cleanTeamName(elements[2].split(">")[1].split("</a")[0]);
-                String home = cleanTeamName(elements[4].split(">")[1].split("</a")[0]);
-                String awayScore = elements[3].split("</td>")[0];
-                String homeScore = elements[5].split("</td>")[0];
+            for (int i = 1; i < rows.size(); i++) {
+                Elements currentRowParts = rows.get(i).select("td");
+                String date = currentRowParts.get(0).childNode(0).toString();
+                String away = cleanTeamName(currentRowParts.get(1).childNode(0).childNode(0).toString());
+                String home = cleanTeamName(currentRowParts.get(3).childNode(0).childNode(0).toString());
+                String awayScore = currentRowParts.get(2).childNode(0).toString();
+                String homeScore = currentRowParts.get(4).childNode(0).toString();
                 String margin = String.valueOf(Integer.valueOf(awayScore) - Integer.valueOf(homeScore));
 
                 DateTimeFormatter format = DateTimeFormat.forPattern("MM/dd");
@@ -761,7 +717,6 @@ public class NCAAMain
                     }
                 }
             }
-
         } catch (Exception e) {
             System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
             System.exit(0);
