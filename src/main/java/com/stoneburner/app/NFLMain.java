@@ -224,8 +224,6 @@ public class NFLMain
         try
         {
             Document page = Jsoup.connect(inputURIDR).get();
-            page.select("h4");
-
             Elements rows = page.select("table[class=small-text]").get(0).select("tr");
 
             for (int i = 2; i < rows.size(); i = i + 2) {
@@ -307,59 +305,6 @@ public class NFLMain
                     }
                 }
             }
-
-            /*source = source.split("<table id=\"wisfb_basicTable\"")[1]
-                    .replaceAll("\\n","").replaceAll("\\t","").replaceAll("\\r","")
-                    .split("</table>")[0];
-
-            String[] rows = Arrays.copyOfRange(source.split("<tr"), 2, source.split("<tr").length-1);
-
-            for (int i = 0; i < rows.length; i ++) {
-                String row = rows[i];
-                String location = rows[i].split("<div class=\"wisfb_fullTeamStacked\">")[1].split("<td class=\"wisfb_oppCol\">")[1]
-                        .split("<span class=\"wisfb_oppInd\">")[1].split("</span>")[0];
-                String favorite = rows[i].split("<div class=\"wisfb_fullTeamStacked\">")[1].split("<span>")[1].split("</span>")[0].trim();
-                String underdog = rows[i].split("<span class=\"wisfb_oppFull\">")[1].split("</span>")[0];
-                String avgScore = rows[i].split("<a class=\"wisfb_avgScoreLink\"")[1].split("target=\"_blank\">")[1].split("</a>")[0];
-
-                ScriptEngineManager mgr = new ScriptEngineManager();
-                ScriptEngine engine = mgr.getEngineByName("JavaScript");
-                Object result = engine.eval(avgScore);
-                double prediction;
-                if (result instanceof Integer) {
-                    prediction = (double)((Integer)result);
-                } else {
-                    prediction = (Double)result;
-                }
-
-
-                boolean homeIsFav = location.equals("vs.");
-                String home = homeIsFav ? favorite : underdog;
-                String away = homeIsFav ? underdog : favorite;
-
-                //Find a spot in our array for these values
-                for (int j = 0; j < numGames; j++) {
-                    double homeResult =  similarity(predictions[j][0], home);
-                    double awayResult =  similarity(predictions[j][1], away);
-                    if (homeResult == 1 || awayResult == 1) {
-                        predictions[j][4] = (homeIsFav ? "-" : "") + prediction;
-                        break;
-                    } else {
-                        homeResult =  similarity(predictions[j][0], away);
-                        awayResult =  similarity(predictions[j][1], home);
-
-                        if (homeResult == 1 || awayResult == 1) {
-                            String third = home;
-                            home = away;
-                            away = third;
-                            prediction = prediction * -1.0;
-                            predictions[j][4] = String.valueOf(prediction);
-                            break;
-                        }
-                    }
-                }
-            }*/
-
         }
 
         catch (Exception e) {
