@@ -80,10 +80,6 @@ public class NCAAMain
     public static void grabPowerRank() {
         System.out.println( "Fetching '" + inputURIPR + "'");
 
-        //manually add a game for some weird reason
-        predictions[numGames][0] = "Connecticut";
-        predictions[numGames++][1] = "East Carolina";
-
         //Execute client with our method
         try
         {
@@ -92,7 +88,7 @@ public class NCAAMain
                     .filter(e -> e.toString().contains("College Football,"))
                     .findFirst()
                     .orElse(null);
-            Element current = ncaaHeader.nextElementSibling().nextElementSibling();
+            Element current = ncaaHeader.nextElementSibling().nextElementSibling().nextElementSibling();
 
             while (current.nextElementSibling() != null) {
                 current = current.nextElementSibling();
@@ -330,7 +326,7 @@ public class NCAAMain
                     DateTime thisPastMonday = new DateTime().withWeekyear(currentDate.getWeekyear()).withYear(2017).withDayOfWeek(1).withHourOfDay(0);
                     DateTime inAWeek = thisPastMonday.plusWeeks(1);
 
-                    String nextGameString = currentPrediction.select("td").get(0).childNode(0).toString();
+                    String nextGameString = currentPrediction.select("td").get(0).childNode(0).toString().trim();
                     DateTimeFormatter format = DateTimeFormat.forPattern("d-MMM");
                     DateTime gameDate = format.withLocale(Locale.ENGLISH).parseDateTime(nextGameString).withYear(thisPastMonday.getYear()).withHourOfDay(22);
 
@@ -520,7 +516,8 @@ public class NCAAMain
                 Element current = rows.get(i);
                 Elements fiveDimes = current.select("a[href$=#BU]");
                 if (fiveDimes.size() == 0) {
-                    //no spread posted
+                    //no spread posted, reset index
+                    i--;
                     continue;
                 }
 
@@ -529,7 +526,7 @@ public class NCAAMain
 
                 List<String> spreadParts = current.select("a[href$=#BU]").get(0).childNodes().stream()
                         .filter(n -> (n instanceof TextNode))
-                        .map(n -> HtmlEscape.unescapeHtml(n.toString()))
+                        .map(n -> HtmlEscape.unescapeHtml(n.toString().replace("PK","-0")))
                         .collect(toList())
                         .subList(1,3);
 

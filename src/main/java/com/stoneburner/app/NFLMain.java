@@ -186,7 +186,7 @@ public class NFLMain
                     .filter(e -> e.toString().contains("NFL,"))
                     .findFirst()
                     .orElse(null);
-            Element current = nflHeader.nextElementSibling();
+            Element current = nflHeader.nextElementSibling().nextElementSibling().nextElementSibling();
 
             while (current.nextElementSibling() != null) {
                 current = current.nextElementSibling();
@@ -621,7 +621,7 @@ public class NFLMain
 
                 List<String> spreadParts = current.select("a[href$=#BU]").get(0).childNodes().stream()
                         .filter(n -> (n instanceof TextNode))
-                        .map(n -> HtmlEscape.unescapeHtml(n.toString()))
+                        .map(n -> HtmlEscape.unescapeHtml(n.toString().replace("PK","-0")))
                         .collect(toList())
                         .subList(1,3);
 
