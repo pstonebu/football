@@ -324,6 +324,9 @@ public class NFLMain
 
             for (int i = 0; i < numGames-1; i++) {
                 Element game = games.get(i);
+                if (game.toString().contains("Results")) {
+                    break;
+                }
                 List<Node> teams = game.select("caption")
                         .get(0).select("caption").get(0).childNodes();
                 String away = teams.get(0).toString().trim();

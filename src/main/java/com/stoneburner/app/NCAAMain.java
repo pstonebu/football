@@ -46,7 +46,7 @@ public class NCAAMain
     public static String inputSagarin = "http://sagarin.com/sports/cfsend.htm";
     public static String inputMassey = "http://www.masseyratings.com/predjson.php?s=cf&sub=11604&dt=$dt$";
     public static String inputSpread = "http://www.vegasinsider.com/college-football/odds/offshore/2/";
-    public static String input538 = "http://projects.fivethirtyeight.com/2016-college-football-predictions/sims.csv";
+    public static String input538 = "http://projects.fivethirtyeight.com/2017-college-football-predictions/sims.csv";
     public static String inputAtomic = "http://www.atomicfootball.com/archive/af_predictions_All.html";
 
     public static void main( String[] args )
@@ -62,7 +62,7 @@ public class NCAAMain
 
         grabPowerRank();
         grabAtomic();
-        //grab538();
+        grab538();
         grabSpread();
         grabSagarin();
         grabMassey();
@@ -228,8 +228,8 @@ public class NCAAMain
                 Element game = games.get(i);
                 List<Node> teams = game.select("caption")
                         .get(0).select("caption").get(0).childNodes();
-                String away = teams.get(0).toString().trim();
-                String home = teams.get(2).toString().trim();
+                String away = cleanTeamName(teams.get(0).toString().trim());
+                String home = cleanTeamName(teams.get(2).toString().trim());
                 String prediction = game.select("td").get(1).childNode(0).toString();
 
                 ScriptEngineManager mgr = new ScriptEngineManager();
@@ -438,7 +438,9 @@ public class NCAAMain
                 //iterate through list of games to find a match
                 for (int j = 0; j < rows.length; j++) {
 
-                    if (!rows[j].toLowerCase().contains(home.toLowerCase()) && !rows[j].toLowerCase().contains(away.toLowerCase())) {
+                    if (rows[j].startsWith("=====")) {
+                        break;
+                    } else if (!rows[j].toLowerCase().contains(home.toLowerCase()) && !rows[j].toLowerCase().contains(away.toLowerCase())) {
                         continue;
                     }
 
@@ -492,8 +494,7 @@ public class NCAAMain
                         }
                     }
                     predictions[i][8] = String.valueOf(averageSpread);
-
-
+                    break;
                 }
             }
         }
@@ -607,7 +608,7 @@ public class NCAAMain
             for (int i = 1; i < rows.length; i++) {
                 String[] rowParts = rows[i].split(",");
                 String teamName = cleanTeamName(rowParts[0]);
-                int won = Integer.valueOf(rowParts[5]);
+                int won = Integer.valueOf(rowParts[6]);
 
                 if (teams.get(teamName) == null) {
                     teams.put(teamName, won);
@@ -760,7 +761,7 @@ public class NCAAMain
         return teamName.replaceAll(" St$"," State").replaceFirst("E ", "Eastern ").replaceFirst("^C ", "Central ").replace("&amp;","&")
                 .replace("FL ", "Florida ").replaceAll("Intl$", "International").replace("FIU","Florida International").replace("AM","A&M").replace("NC ", "North Carolina ")
                 .replaceAll(" St.$"," State").replace("<b>","").replace("</b>","").replaceFirst("^W ", "Western ").replaceFirst("^Ga ", "Georgia ")
-                .replace("N Illinois","Northern Illinois").replace("Kent","Kent State").replaceAll("^ULM$","Louisiana Monroe").replaceAll("^ULL$","Louisiana Lafayette")
+                .replace("N Illinois","Northern Illinois").replaceAll("^Kent$","Kent State").replaceAll("^ULM$","Louisiana Monroe").replaceAll("^ULL$","Louisiana Lafayette")
                 .replace("Louisiana-Monroe", "Louisiana Monroe").replace("Louisiana-Lafayette", "Louisiana Lafayette").trim();
     }
 
