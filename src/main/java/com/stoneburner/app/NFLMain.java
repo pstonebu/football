@@ -196,8 +196,8 @@ public class NFLMain
 
                 String teamsString = current.select("strong").get(0).childNodes().get(0).toString()
                         .replaceAll("[0-9]*","").replaceAll("\\.","").trim();
-                String away = teamsString.split("(\\bat\\b|\\bversus\\b)")[0].trim();
-                String home = teamsString.split("(\\bat\\b|\\bversus\\b)")[1].trim();
+                String away = cleanTeamName(teamsString.split("(\\bat\\b|\\bversus\\b)")[0].trim());
+                String home = cleanTeamName(teamsString.split("(\\bat\\b|\\bversus\\b)")[1].trim());
 
                 Node summary = current.childNodes().get(2);
                 boolean negative = summary.toString().startsWith(home);
@@ -213,7 +213,7 @@ public class NFLMain
             }
         }
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -230,8 +230,8 @@ public class NFLMain
                 Element rowOne = rows.get(i);
                 Element rowTwo = rows.get(i+1);
 
-                String away = rowOne.select("td").get(2).childNodes().get(0).toString();
-                String home = rowTwo.select("td").get(0).childNodes().get(0).toString();
+                String away = cleanTeamName(rowOne.select("td").get(2).childNodes().get(0).toString());
+                String home = cleanTeamName(rowTwo.select("td").get(0).childNodes().get(0).toString());
 
                 //Grab spread, and favorite
                 String homePoints = rowTwo.select("td").get(5).childNodes().get(0).childNodes().get(0).toString().trim();
@@ -251,7 +251,7 @@ public class NFLMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -308,7 +308,7 @@ public class NFLMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -329,8 +329,8 @@ public class NFLMain
                 }
                 List<Node> teams = game.select("caption")
                         .get(0).select("caption").get(0).childNodes();
-                String away = teams.get(0).toString().trim();
-                String home = teams.get(2).toString().trim();
+                String away = cleanTeamName(teams.get(0).toString().trim());
+                String home = cleanTeamName(teams.get(2).toString().trim());
                 String prediction = game.select("td").get(1).childNode(0).toString();
 
                 ScriptEngineManager mgr = new ScriptEngineManager();
@@ -378,7 +378,7 @@ public class NFLMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -417,7 +417,7 @@ public class NFLMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -441,8 +441,8 @@ public class NFLMain
 
             for (Object currentGame : gamesArray) {
                 JSONArray current = (JSONArray)currentGame;
-                String away = (String)((JSONArray)current.get(2)).get(0);
-                String home = ((String)((JSONArray)current.get(3)).get(0)).replace("@ ", "");
+                String away = cleanTeamName((String)((JSONArray)current.get(2)).get(0));
+                String home = cleanTeamName(((String)((JSONArray)current.get(3)).get(0)).replace("@ ", ""));
                 Double spread = null;
                 Object prediction = ((JSONArray)current.get(12)).get(0);
                 if (prediction instanceof Integer) {
@@ -495,7 +495,7 @@ public class NFLMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -518,8 +518,8 @@ public class NFLMain
                     7, numGames+7);
 
             for (int i = 0; i < numGames; i++) {
-                String home = predictions[i][0];
-                String away = predictions[i][1];
+                String home = cleanTeamName(predictions[i][0]);
+                String away = cleanTeamName(predictions[i][1]);
 
                 //iterate through list of games to find a match
                 for (int j = 0; j < rows.length; j++) {
@@ -598,7 +598,7 @@ public class NFLMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -619,8 +619,8 @@ public class NFLMain
                     continue;
                 }
 
-                String teamOne = current.select("a[class=tabletext]").get(0).childNode(0).toString();
-                String teamTwo = current.select("a[class=tabletext]").get(1).childNode(0).toString();
+                String teamOne = cleanTeamName(current.select("a[class=tabletext]").get(0).childNode(0).toString());
+                String teamTwo = cleanTeamName(current.select("a[class=tabletext]").get(1).childNode(0).toString());
 
                 List<String> spreadParts = current.select("a[href$=#BU]").get(0).childNodes().stream()
                         .filter(n -> (n instanceof TextNode))
@@ -679,7 +679,7 @@ public class NFLMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -701,13 +701,13 @@ public class NFLMain
             return Integer.valueOf(input);
 
         } catch (IOException e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
         return -1;
     }
 
-    public static double similarity(String s1, String s2) {
+    private static double similarity(String s1, String s2) {
         String longer = s1, shorter = s2;
         if (s1.length() < s2.length()) { // longer should always have greater length
             longer = s2; shorter = s1;
@@ -718,6 +718,13 @@ public class NFLMain
         return (longerLength - StringUtils.getLevenshteinDistance(longer, shorter)) /
                                (double) longerLength;
 
+    }
+
+    private static String cleanTeamName(String teamName) {
+        return teamName.replaceFirst("NY", "New York")
+                .replaceFirst("N.Y.", "New York")
+                .replaceFirst("LA", "Los Angeles")
+                .replaceFirst("L.A.", "Los Angeles");
     }
 
     public static void printResults() {

@@ -114,7 +114,7 @@ public class BowlMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -191,7 +191,7 @@ public class BowlMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -278,7 +278,7 @@ public class BowlMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -350,7 +350,7 @@ public class BowlMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -416,7 +416,7 @@ public class BowlMain
 
 
             } catch (Exception e) {
-                System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+                e.printStackTrace(System.out);
             }
         }
     }
@@ -489,7 +489,7 @@ public class BowlMain
 
 
             } catch (Exception e) {
-                System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+                e.printStackTrace(System.out);
                 System.exit(0);
             }
             firstGameDate = firstGameDate.plusDays(1);
@@ -688,7 +688,7 @@ public class BowlMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -755,7 +755,7 @@ public class BowlMain
             }
 
         } catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -828,7 +828,7 @@ public class BowlMain
             }
 
         } catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -850,7 +850,7 @@ public class BowlMain
             return Integer.valueOf(input);
 
         } catch (IOException e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
         return -1;

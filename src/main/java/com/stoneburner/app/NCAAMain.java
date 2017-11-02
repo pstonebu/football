@@ -71,7 +71,6 @@ public class NCAAMain
         grabFox();
         grabOddsShark();
 
-
         printResults();
 
         System.out.println("Done!");
@@ -98,8 +97,8 @@ public class NCAAMain
 
                 String teamsString = current.select("strong").get(0).childNode(0).toString()
                         .replaceAll("[0-9]*","").replaceAll("\\.","").trim();
-                String away = teamsString.split("(\\bat\\b|\\bversus\\b)")[0].trim();
-                String home = teamsString.split("(\\bat\\b|\\bversus\\b)")[1].trim();
+                String away = cleanTeamName(teamsString.split("(\\bat\\b|\\bversus\\b)")[0].trim());
+                String home = cleanTeamName(teamsString.split("(\\bat\\b|\\bversus\\b)")[1].trim());
 
                 Node summary = current.childNodes().get(2);
                 boolean negative = summary.toString().startsWith(home);
@@ -116,7 +115,7 @@ public class NCAAMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -154,7 +153,7 @@ public class NCAAMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -211,7 +210,7 @@ public class NCAAMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -224,10 +223,13 @@ public class NCAAMain
             Document page = Jsoup.connect(inputURIOS).get();
             Elements games = page.select("table");
 
-            for (int i = 0; i < numGames-1; i++) {
+            for (int i = 0; i < games.size(); i++) {
                 Element game = games.get(i);
                 List<Node> teams = game.select("caption")
                         .get(0).select("caption").get(0).childNodes();
+                if (teams.size() < 3) {
+                    continue;
+                }
                 String away = cleanTeamName(teams.get(0).toString().trim());
                 String home = cleanTeamName(teams.get(2).toString().trim());
                 String prediction = game.select("td").get(1).childNode(0).toString();
@@ -277,7 +279,7 @@ public class NCAAMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -345,7 +347,7 @@ public class NCAAMain
                 }
 
             } catch (Exception e) {
-                System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+                e.printStackTrace(System.out);
             }
         }
     }
@@ -416,7 +418,7 @@ public class NCAAMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -522,8 +524,8 @@ public class NCAAMain
                     continue;
                 }
 
-                String teamOne = current.select("a[class=tabletext]").get(0).childNode(0).toString();
-                String teamTwo = current.select("a[class=tabletext]").get(1).childNode(0).toString();
+                String teamOne = cleanTeamName(current.select("a[class=tabletext]").get(0).childNode(0).toString());
+                String teamTwo = cleanTeamName(current.select("a[class=tabletext]").get(1).childNode(0).toString());
 
                 List<String> spreadParts = current.select("a[href$=#BU]").get(0).childNodes().stream()
                         .filter(n -> (n instanceof TextNode))
@@ -574,7 +576,7 @@ public class NCAAMain
                         }
                     }
                     if (actualRow < 0) {
-                        actualRow = askForRow(9, teamOne, teamTwo);
+                        actualRow = askForRow(11, teamOne, teamTwo);
                         if (actualRow >= 0) {
                             predictions[actualRow][11] = String.valueOf(spread);
                         }
@@ -584,7 +586,7 @@ public class NCAAMain
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -651,7 +653,7 @@ public class NCAAMain
             }
 
         } catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -716,7 +718,7 @@ public class NCAAMain
                 }
             }
         } catch (Exception e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
@@ -738,7 +740,7 @@ public class NCAAMain
             return Integer.valueOf(input);
 
         } catch (IOException e) {
-            System.out.println("Exception occurred: " + e.getStackTrace() + e.toString());
+            e.printStackTrace(System.out);
             System.exit(0);
         }
         return -1;
@@ -762,7 +764,9 @@ public class NCAAMain
                 .replace("FL ", "Florida ").replaceAll("Intl$", "International").replace("FIU","Florida International").replace("AM","A&M").replace("NC ", "North Carolina ")
                 .replaceAll(" St.$"," State").replace("<b>","").replace("</b>","").replaceFirst("^W ", "Western ").replaceFirst("^Ga ", "Georgia ")
                 .replace("N Illinois","Northern Illinois").replaceAll("^Kent$","Kent State").replaceAll("^ULM$","Louisiana Monroe").replaceAll("^ULL$","Louisiana Lafayette")
-                .replace("Louisiana-Monroe", "Louisiana Monroe").replace("Louisiana-Lafayette", "Louisiana Lafayette").trim();
+                .replace("Louisiana-Monroe", "Louisiana Monroe").replace("Louisiana-Lafayette", "Louisiana Lafayette").replace("Ohio U.", "Ohio")
+                .replace("Miami OH", "Miami (OH)").replace("Int'l", "International").replace("UCF", "Central Florida")
+                .replace("SMU", "Southern Methodist").replace("Middle Tennessee", "Middle Tennessee State").replace("Texas El Paso", "UTEP").trim();
     }
 
     public static void printResults() {
