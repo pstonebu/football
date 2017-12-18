@@ -5,45 +5,57 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DecompressingHttpClient;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.jsoup.HttpStatusException;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.nodes.Node;
+import org.jsoup.nodes.TextNode;
+import org.jsoup.select.Elements;
 import org.unbescape.html.HtmlEscape;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import java.io.*;
-import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+
+import static com.stoneburner.app.NCAAMain.cleanTeamName;
+import static java.net.URLEncoder.encode;
+import static java.util.stream.Collectors.toList;
 
 public class BowlMain
 {
     //Home  Away    PR  DR  Fox  OS S&P+    Massey  Sagarin 538 Atomic  Spread
     public static String[][] predictions = new String[100][12];
     public static int numGames = 0;
-    public static DateTime firstGameDate = new DateTime(1482739200000l);
-    public static DateTime lastGameDate = new DateTime(1484035200000l);
+    public static DateTime firstGameDate = new DateTime(1514313000000l);
+    public static DateTime lastGameDate = new DateTime(1515459600000l);
     public static String inputURIPR = "https://thepowerrank.com/predictions/";
     public static String inputURIDR = "http://www.dratings.com/predictor/ncaa-football-predictions/";
     public static String inputURIOS = "http://www.oddsshark.com/ncaaf/computer-picks";
-    public static String inputURIFox = "http://www.foxsports.com/college-football/predictions?season=2016&seasonType=2&week=1&group=-3";
-    public static String inputSP = "http://www.footballstudyhall.com/pages/2016-%team%-advanced-statistical-profile";
+    public static String inputURIFox = "http://www.foxsports.com/college-football/predictions?season=2017&seasonType=2&week=1&group=-3";
+    public static String inputSP = "https://www.footballstudyhall.com/pages/2017-%team%-advanced-statistical-profile";
     public static String inputSagarin = "http://sagarin.com/sports/cfsend.htm";
     public static String inputMassey = "http://www.masseyratings.com/predjson.php?s=cf&sub=11604&dt=$dt$";
     public static String inputSpread = "http://www.vegasinsider.com/college-football/odds/offshore/2/";
-    public static String input538 = "http://projects.fivethirtyeight.com/2016-college-football-predictions/sims.csv";
+    public static String input538 = "http://projects.fivethirtyeight.com/2017-college-football-predictions/sims.csv";
     public static String inputAtomic = "http://www.atomicfootball.com/archive/af_predictions_All.html";
 
     public static void main( String[] args )
     {
+        DateTimeFormatter dtfOut = DateTimeFormat.forPattern("yyyyMMdd");
+        inputMassey = inputMassey.replace("$dt$", dtfOut.print(firstGameDate));
+        
         grabPowerRank();
         grabAtomic();
         //grab538();
@@ -64,52 +76,40 @@ public class BowlMain
     public static void grabPowerRank() {
         System.out.println( "Fetching '" + inputURIPR + "'");
 
-        //Instantiate client and method
-        HttpClient client = new DefaultHttpClient();
-        HttpGet method = new HttpGet(inputURIPR);
-
         //Execute client with our method
         try
         {
+            Document page = Jsoup.connect(inputURIPR).get();
+            Element ncaaHeader = page.select("h2").stream()
+                    .filter(e -> e.toString().contains("College Football Bowls"))
+                    .findFirst()
+                    .orElse(null);
+            Element current = ncaaHeader.nextElementSibling();
 
+            while (current.nextElementSibling() != null) {
+                current = current.nextElementSibling();
+                if (!current.tagName().equals("p")) {
+                    break;
+                } else if (!current.child(0).tagName().equals("strong")) {
+                    continue;
+                }
 
-            HttpResponse response = client.execute(method);
+                String teamsString = current.select("strong").get(0).childNode(0).toString()
+                        .replaceAll("[0-9]*","").replaceAll("\\.","").trim();
+                String away = cleanTeamName(teamsString.split("(\\bat\\b|\\bversus\\b)")[0].trim());
+                String home = cleanTeamName(teamsString.split("(\\bat\\b|\\bversus\\b)")[1].trim());
 
-            String source = EntityUtils.toString(response.getEntity());
-            source = source.split("<h2>College Football Bowl Games</h2>")[1];
-            source = source.split("<h2>National Football League, Week [0-9]+</h2")[0];
-            String[] games = Arrays.copyOfRange(source.split("<strong>"), 1, source.split("<strong>").length);
-
-            //for (String game : games) {
-            for (int i = 0; i < games.length; i++) {
-                String game = games[i];
-                game = HtmlEscape.unescapeHtml(game).replace("</strong>","").replace("<br />", " ")
-                        .replaceAll("\\([0-9]*\\) ","").replace("</p>", "").replace("\n", "").replace("<p>","");
-                String home;
-                String away;
-                String spread;
-
-                String[] sentences = game.split("\\.[ ]+");
-
-                //Grab team names
-                away = sentences[1].split("(\\bat\\b|\\bversus\\b)")[0].trim();
-                home = sentences[1].split("(\\bat\\b|\\bversus\\b)")[1].trim();
-
-                //Grab spread, and favorite
-                boolean negative = sentences[2].startsWith(home);
-                Pattern p = Pattern.compile("(.*)(\\d+)(.*)");
-                Matcher m = p.matcher(sentences[2]);
-                String[] spreadParts = sentences[2].split("\\.");
+                Node summary = current.childNodes().get(2);
+                boolean negative = summary.toString().startsWith(home);
+                String[] spreadParts = summary.toString().split("\\.");
                 String spreadTail = spreadParts[1].split(" ")[0];
                 String spreadHead = spreadParts[0].split(" ")[spreadParts[0].split(" ").length - 1];
 
-                spread = (negative ? "-" : "") + spreadHead + "." + spreadTail;
+                String spread = (negative ? "-" : "") + spreadHead + "." + spreadTail;
 
-                predictions[i][0] = home;
-                predictions[i][1] = away;
-                predictions[i][2] = spread;
-                numGames++;
-
+                predictions[numGames][0] = home;
+                predictions[numGames][1] = away;
+                predictions[numGames++][2] = spread;
             }
         }
 
@@ -122,51 +122,30 @@ public class BowlMain
     public static void grabDRatings() {
         System.out.println( "Fetching '" + inputURIDR + "'");
 
-        //Instantiate client and method
-        HttpClient client = new DefaultHttpClient();
-        HttpGet method = new HttpGet(inputURIDR);
-
-        //Execute client with our method
         try
         {
+            Document page = Jsoup.connect(inputURIDR).get();
+            Elements rows = page.select("table[class=small-text]").get(1).select("tr");
 
-            HttpResponse response = client.execute(method);
+            for (int i = 2; i < rows.size(); i = i + 2) {
+                Element rowOne = rows.get(i);
+                Element rowTwo = rows.get(i+1);
 
-            String source = EntityUtils.toString(response.getEntity());
-            source = source.split("<h5>NCAA Football FBS Games Predictions</h5>")[1];
-            source = source.split("<tbody>")[1];
-            source = source.replaceAll("\\n","").trim().split("</tbody>")[0];
-            String[] rows = Arrays.copyOfRange(source.split("<tr>"), 2, source.split("<tr>").length);
-
-            for (int i = 0; i < numGames*2; i = i+2) {
-                String row1 = rows[i];
-                String row2 = rows[i+1];
-
-                //Grab team names
-                String home;
-                String away;
-
-                away = row1.split("(\\bat\\b|\\bvs\\b)")[0].trim().split("<td rowspan=\"2\">")[2];
-                home = row1.split("(\\bat\\b|\\bvs\\b)")[1].trim().split("</td>")[0];
-
-                away = cleanTeamName(away);
-                home = cleanTeamName(home);
+                String away = cleanTeamName(rowOne.select("td").get(2).childNodes().get(0).toString());
+                String home = cleanTeamName(rowTwo.select("td").get(0).childNodes().get(0).toString());
 
                 //Grab spread, and favorite
-                String homePoints = row2.split("<center>")[2].split("</center>")[0];
-                String awayPoints = row1.split("<center>")[2].split("</center>")[0];
+                String homePoints = rowTwo.select("td").get(5).childNodes().get(0).childNodes().get(0).toString().trim();
+                String awayPoints = rowOne.select("td").get(7).childNodes().get(0).childNodes().get(0).toString().trim();
 
                 double margin = Double.valueOf(awayPoints) - Double.valueOf(homePoints);
 
                 //Find a spot in our array for these values
-                int actualRow = -1;
                 for (int j = 0; j < numGames; j++) {
                     double homeResult =  similarity(predictions[j][0], home);
                     double awayResult =  similarity(predictions[j][1], away);
                     if (homeResult == 1 || awayResult == 1) {
-                        actualRow = j;
-                        predictions[actualRow][3] = String.valueOf(margin);
-                        //maybe the two are reversed?
+                        predictions[j][3] = String.valueOf(margin);
                     } else {
                         homeResult =  similarity(predictions[j][0], away);
                         awayResult =  similarity(predictions[j][1], home);
@@ -176,15 +155,9 @@ public class BowlMain
                             home = away;
                             away = third;
                             margin = margin * -1.0;
-                            actualRow = j;
-                            predictions[actualRow][3] = String.valueOf(margin);
+                            predictions[j][3] = String.valueOf(margin);
+                            break;
                         }
-                    }
-                }
-                if (actualRow < 0) {
-                    actualRow = askForRow(3, home, away);
-                    if (actualRow >= 0) {
-                        predictions[actualRow][3] = String.valueOf(Double.valueOf(awayPoints) - Double.valueOf(homePoints));
                     }
                 }
             }
@@ -199,39 +172,24 @@ public class BowlMain
     public static void grabFox() {
         System.out.println( "Fetching '" + inputURIFox + "'");
 
-        //Instantiate client and method
-        HttpClient client = new DefaultHttpClient();
-        HttpGet method = new HttpGet(inputURIFox);
-
-        //Execute client with our method
         try
         {
+            Document page = Jsoup.connect(inputURIFox).get();
+            Elements games = page.select("div[class=wisbb_predictionChip]");
 
-            HttpResponse response = client.execute(method);
-
-            String source = EntityUtils.toString(response.getEntity());
-            source = source.split("<table class=\"wisfb_standard wisfb_hoverHighlight\">")[1]
-                    .replaceAll("\\n","").replaceAll("\\t","").replaceAll("\\r","")
-                    .split("</table>")[0];
-
-            String[] rows = Arrays.copyOfRange(source.split("<tr>"), 2, source.split("<tr>").length-1);
-
-            for (int i = 0; i < rows.length; i ++) {
-                String row = rows[i];
-                String location = rows[i].split("<div class=\"wisfb_fullTeamStacked\">")[1].split("<td class=\"wisfb_oppCol\">")[1].split("<span>")[1].split("</span>")[0].trim();
-                String favorite = rows[i].split("alt=\"")[1].split("\"")[0];
-                String underdog = rows[i].split("<span class=\"wisfb_oppFull\">")[1].split("</span>")[0];
-                String avgScore = rows[i].split("<a class=\"wisfb_avgScoreLink\".*target=\"_blank\">")[1].split("</a>")[0];
-
-                String spread = rows[i].split("</span></td><td>")[1].split("</td>")[0];
-                //FCS game
-                if (spread.equals("--")) {
+            for (Element game : games) {
+                Elements teams = game.select("span[class=wisbb_teamName]");
+                if (teams.size() == 0) {
                     continue;
                 }
 
+                String away = teams.get(0).childNode(0).toString();
+                String home = teams.get(1).childNode(0).toString();
+
+                String score = game.select("span[class=wisbb_predData]").get(0).childNodes().get(0).toString();
                 ScriptEngineManager mgr = new ScriptEngineManager();
                 ScriptEngine engine = mgr.getEngineByName("JavaScript");
-                Object result = engine.eval(avgScore);
+                Object result = engine.eval(score);
                 double prediction;
                 if (result instanceof Integer) {
                     prediction = (double)((Integer)result);
@@ -239,20 +197,12 @@ public class BowlMain
                     prediction = (Double)result;
                 }
 
-
-                boolean homeIsFav = location.equals("vs.");
-                String home = cleanTeamName(homeIsFav ? favorite : underdog);
-                String away = cleanTeamName(homeIsFav ? underdog : favorite);
-
-                //Find a spot in our array for these values
-                int actualRow = -1;
                 for (int j = 0; j < numGames; j++) {
                     double homeResult =  similarity(predictions[j][0], home);
                     double awayResult =  similarity(predictions[j][1], away);
                     if (homeResult == 1 || awayResult == 1) {
-                        actualRow = j;
-                        predictions[actualRow][4] = (homeIsFav ? "-" : "") + prediction;
-                        //maybe the two are reversed?
+                        predictions[j][4] = String.valueOf(prediction);
+                        break;
                     } else {
                         homeResult =  similarity(predictions[j][0], away);
                         awayResult =  similarity(predictions[j][1], home);
@@ -262,19 +212,12 @@ public class BowlMain
                             home = away;
                             away = third;
                             prediction = prediction * -1.0;
-                            actualRow = j;
-                            predictions[actualRow][4] = String.valueOf(prediction);
+                            predictions[j][4] = String.valueOf(prediction);
+                            break;
                         }
                     }
                 }
-                if (actualRow < 0) {
-                    actualRow = askForRow(4, homeIsFav ? favorite : underdog, homeIsFav ? underdog : favorite);
-                    if (actualRow >= 0) {
-                        predictions[actualRow][4] = (homeIsFav ? "-" : "") + prediction;
-                    }
-                }
             }
-
         }
 
         catch (Exception e) {
@@ -286,25 +229,21 @@ public class BowlMain
     public static void grabOddsShark() {
         System.out.println( "Fetching '" + inputURIOS + "'");
 
-        //Instantiate client and method
-        HttpClient client = new DefaultHttpClient();
-        HttpGet method = new HttpGet(inputURIOS);
-
-        //Execute client with our method
         try
         {
-            HttpResponse response = client.execute(method);
+            Document page = Jsoup.connect(inputURIOS).get();
+            Elements games = page.select("table");
 
-            String source = EntityUtils.toString(response.getEntity());
-            String[] allRows = source.split("<div class=\"region region-content\"><div id=\"block-system-main\" class=\"block block-system\"><div class=\"content\">")[1]
-                    .split("<table class=\"base-table\">");
-            String[] rows = Arrays.copyOfRange(allRows, 1, allRows.length-1);
-
-            for (int i = 0; i < rows.length; i++) {
-                String current = rows[i];
-                String away = cleanTeamName(current.split("<caption>")[1].split("<a href=")[0].trim());
-                String home = cleanTeamName(current.split("</a>")[1].split("</caption")[0].trim());
-                String prediction = current.split("Predicted Score</td><td>")[1].split("</td>")[0];
+            for (int i = 0; i < games.size(); i++) {
+                Element game = games.get(i);
+                List<Node> teams = game.select("caption")
+                        .get(0).select("caption").get(0).childNodes();
+                if (teams.size() < 3) {
+                    continue;
+                }
+                String away = cleanTeamName(teams.get(0).toString().trim());
+                String home = cleanTeamName(teams.get(2).toString().trim());
+                String prediction = game.select("td").get(1).childNode(0).toString();
 
                 ScriptEngineManager mgr = new ScriptEngineManager();
                 ScriptEngine engine = mgr.getEngineByName("JavaScript");
@@ -324,6 +263,7 @@ public class BowlMain
                     if (homeResult == 1 || awayResult == 1) {
                         actualRow = j;
                         predictions[actualRow][5] = String.valueOf(margin);
+                        break;
                         //maybe the two are reversed?
                     } else {
                         homeResult =  similarity(predictions[j][0], away);
@@ -336,6 +276,7 @@ public class BowlMain
                             margin = margin * -1.0;
                             actualRow = j;
                             predictions[actualRow][5] = String.valueOf(margin);
+                            break;
                         }
                     }
                 }
@@ -346,7 +287,6 @@ public class BowlMain
                     }
                 }
             }
-
         }
 
         catch (Exception e) {
@@ -361,50 +301,54 @@ public class BowlMain
         for (int i = 0; i < numGames; i++) {
             String homeTeam = predictions[i][0];
             String awayTeam = predictions[i][1];
-            String homeUrl = inputSP.replaceAll("%team%", URLEncoder.encode(homeTeam.toLowerCase()).replace("+","-"));
-            String awayUrl = inputSP.replaceAll("%team%", URLEncoder.encode(awayTeam.toLowerCase()).replace("+","-"));
+            String homeUrl;
+            String awayUrl;
+            try {
+                homeUrl = inputSP.replaceAll("%team%", encode(homeTeam.toLowerCase(), "UTF-8").replace("+", "-"));
+                awayUrl = inputSP.replaceAll("%team%", encode(awayTeam.toLowerCase(), "UTF-8").replace("+", "-"));
+            } catch (UnsupportedEncodingException e) {
+                break;
+            }
+
             System.out.println("Fetching '" + (homeTeamFailure ? awayUrl : homeUrl) + "'");
 
-            //Instantiate client and method
-            HttpClient client = new DefaultHttpClient();
-            HttpGet method = new HttpGet(homeTeamFailure ? awayUrl : homeUrl);
-
-            //Execute client with our method
             try {
-                HttpResponse response = client.execute(method);
-                if (response.getStatusLine().getStatusCode() >= 300) {
-                    if (!homeTeamFailure) {
-                        --i;
+                Document page = null;
+                try {
+                    page = Jsoup.connect(homeTeamFailure ? awayUrl : homeUrl).get();
+                } catch (HttpStatusException ex) {
+                    if (ex.getStatusCode() >= 300) {
+                        if (!homeTeamFailure) {
+                            --i;
+                        }
+                        homeTeamFailure = !homeTeamFailure;
+                        continue;
                     }
-                    homeTeamFailure = !homeTeamFailure;
-                    continue;
                 }
-                String source = EntityUtils.toString(response.getEntity());
 
-                String[] tables = source.split("<table border=\"1\"");
-                String predictionTable = tables[2].replaceAll("\\r","").replaceAll("\\n","");
-                if (!predictionTable.contains("Cumulative")) {
-                    System.out.println("The third table didn't look like the predictions table, continuing on.");
+                Element predictionTable = page.select("table").get(1);
+                if (!predictionTable.toString().contains("Cumulative")) {
+                    System.out.println("The second table didn't look like the predictions table, continuing on.");
                     continue;
                 }
 
-                for (int j = 2; j < predictionTable.split("<tr>").length; j++) {
+                Elements predictionsRows = predictionTable.select("tr");
+                for (int j = 1; j < predictionsRows.size()+1; j++) {
+                    Element currentPrediction = predictionsRows.get(j);
                     DateTime currentDate = new DateTime();
-                    DateTime thisPastMonday = new DateTime().withWeekyear(currentDate.getWeekyear()).withYear(2016).withDayOfWeek(1).withHourOfDay(0);
+                    DateTime thisPastMonday = new DateTime().withWeekyear(currentDate.getWeekyear()).withYear(2017).withDayOfWeek(1).withHourOfDay(0);
                     DateTime inAMonth = thisPastMonday.plusMonths(1);
 
-                    String nextPredictionRow = predictionTable.split("<tr>")[j];
-                    String nextGameDate = nextPredictionRow.split("<td>")[1].split("</td>")[0];
-
+                    String nextGameString = currentPrediction.select("td").get(0).childNode(0).toString().trim();
                     DateTimeFormatter format = DateTimeFormat.forPattern("d-MMM");
-                    DateTime gameDate = format.withLocale(Locale.ENGLISH).parseDateTime(nextGameDate).
-                            withYear(nextGameDate.endsWith("Jan") ? thisPastMonday.getYear() + 1 : thisPastMonday.getYear()).withHourOfDay(22);
+                    DateTime gameDate = format.withLocale(Locale.ENGLISH).parseDateTime(nextGameString).
+                            withYear(nextGameString.endsWith("Jan") ? thisPastMonday.getYear() + 1 : thisPastMonday.getYear()).withHourOfDay(22);
 
                     if (gameDate.getMillis() < thisPastMonday.getMillis() || gameDate.getMillis() > inAMonth.getMillis()) {
                         System.out.println("Something weird with the next game date. Continuing.");
                         continue;
                     } else {
-                        String spread = nextPredictionRow.split("<td align=\"center\">")[4].replaceAll("</td>","");
+                        String spread = currentPrediction.select("td").get(5).childNode(0).toString();
                         if (!homeTeamFailure) {
                             spread = "-" + spread;
                         }
@@ -414,7 +358,6 @@ public class BowlMain
                     }
                 }
 
-
             } catch (Exception e) {
                 e.printStackTrace(System.out);
             }
@@ -422,101 +365,85 @@ public class BowlMain
     }
 
     public static void grabMassey() {
-        while (true) {
-            //What week of the season is it?
-            DateTimeFormatter dtfOut = DateTimeFormat.forPattern("yyyyMMdd");
-            String url = inputMassey.replace("$dt$", dtfOut.print(firstGameDate));
-
-            System.out.println("Fetching '" + url + "'");
-
-            //Instantiate client and method
-            HttpClient client = new DefaultHttpClient();
-            HttpGet method = new HttpGet(url);
-
-            //Execute client with our method
-            try {
-                HttpResponse response = client.execute(method);
-
-                String source = EntityUtils.toString(response.getEntity());
-
-                JSONObject json = new JSONObject(source);
-                JSONArray gamesArray = (JSONArray) json.get("DI");
-
-                for (Object currentGame : gamesArray) {
-                    JSONArray current = (JSONArray) currentGame;
-                    String away = cleanTeamName((String) ((JSONArray) current.get(2)).get(0));
-                    String home = cleanTeamName(((String) ((JSONArray) current.get(3)).get(0)).replace("@ ", ""));
-                    double spread;
-                    Object prediction = ((JSONArray) current.get(12)).get(0);
-                    if (prediction instanceof Integer) {
-                        spread = (double) ((Integer) prediction) * -1.0;
-                    } else if (prediction instanceof Double) {
-                        spread = (Double) prediction * -1.0;
-                    } else {
-                        continue;
-                    }
-
-                    //Find a spot in our array for these values
-                    int actualRow = -1;
-                    for (int j = 0; j < numGames; j++) {
-                        double homeResult = similarity(predictions[j][0], home);
-                        double awayResult = similarity(predictions[j][1], away);
-                        if (homeResult == 1 || awayResult == 1) {
-                            actualRow = j;
-                            predictions[actualRow][7] = String.valueOf(spread);
-                            //maybe the two are reversed?
-                        } else {
-                            homeResult = similarity(predictions[j][0], away);
-                            awayResult = similarity(predictions[j][1], home);
-
-                            if (homeResult == 1 || awayResult == 1) {
-                                String third = home;
-                                home = away;
-                                away = third;
-                                spread = spread * -1.0;
-                                actualRow = j;
-                                predictions[actualRow][7] = String.valueOf(spread);
-                            }
-                        }
-                    }
-                    if (actualRow < 0) {
-                        actualRow = askForRow(7, home, away);
-                        if (actualRow >= 0) {
-                            predictions[actualRow][7] = String.valueOf(spread);
-                        }
-                    }
-                }
-
-
-            } catch (Exception e) {
-                e.printStackTrace(System.out);
-                System.exit(0);
-            }
-            firstGameDate = firstGameDate.plusDays(1);
-            if (firstGameDate.isAfter(lastGameDate)) {
-                break;
-            }
-        }
-    }
-
-    public static void grabSagarin() {
-        System.out.println( "Fetching '" + inputSagarin + "'");
+        System.out.println( "Fetching '" + inputMassey + "'");
 
         //Instantiate client and method
-        HttpClient client = new DefaultHttpClient();
-        HttpGet method = new HttpGet(inputSagarin);
+        HttpClient client = HttpClientBuilder.create().build();
+        HttpGet method = new HttpGet(inputMassey);
 
         //Execute client with our method
         try
         {
             HttpResponse response = client.execute(method);
 
-            String html = EntityUtils.toString(response.getEntity());
+            String source = EntityUtils.toString(response.getEntity());
 
-            String picks = html.split("<a name=\"New_Feature\"><b>New_Feature</b></a>")[1].split("</pre>")[0];
+            JSONObject json = new JSONObject(source);
+            JSONArray gamesArray = (JSONArray) json.get("DI");
 
-            String[] rows = Arrays.copyOfRange(picks.split("\r\n"),
-                    7, picks.split("\r\n").length-2);
+            for (Object currentGame : gamesArray) {
+                JSONArray current = (JSONArray)currentGame;
+                String away = cleanTeamName((String)((JSONArray)current.get(2)).get(0));
+                String home = cleanTeamName(((String)((JSONArray)current.get(3)).get(0)).replace("@ ", ""));
+                double spread;
+                Object prediction = ((JSONArray)current.get(12)).get(0);
+                if (prediction instanceof Integer) {
+                    spread = (double)((Integer)prediction) * -1.0;
+                } else if (prediction instanceof Double) {
+                    spread = (Double)prediction * -1.0;
+                } else {
+                    continue;
+                }
+
+                //Find a spot in our array for these values
+                int actualRow = -1;
+                for (int j = 0; j < numGames; j++) {
+                    double homeResult =  similarity(predictions[j][0], home);
+                    double awayResult =  similarity(predictions[j][1], away);
+                    if (homeResult == 1 || awayResult == 1) {
+                        actualRow = j;
+                        predictions[actualRow][7] = String.valueOf(spread);
+                        //maybe the two are reversed?
+                    } else {
+                        homeResult =  similarity(predictions[j][0], away);
+                        awayResult =  similarity(predictions[j][1], home);
+
+                        if (homeResult == 1 || awayResult == 1) {
+                            String third = home;
+                            home = away;
+                            away = third;
+                            spread = spread * -1.0;
+                            actualRow = j;
+                            predictions[actualRow][7] = String.valueOf(spread);
+                        }
+                    }
+                }
+                if (actualRow < 0) {
+                    actualRow = askForRow(7, home, away);
+                    if (actualRow >= 0) {
+                        predictions[actualRow][7] = String.valueOf(spread);
+                    }
+                }
+            }
+
+
+        }
+
+        catch (Exception e) {
+            e.printStackTrace(System.out);
+            System.exit(0);
+        }
+    }
+
+    public static void grabSagarin() {
+        System.out.println( "Fetching '" + inputSagarin + "'");
+
+        try
+        {
+            Document page = Jsoup.connect(inputSagarin).get();
+            Node predictionSection = page.select("a[name=New_Feature]").get(0).parent().parent().parent().childNode(2);
+            String[] rows = Arrays.copyOfRange(predictionSection.toString().split("\r\n"), 7,
+                    predictionSection.toString().split("\r\n").length);
 
             for (int i = 0; i < numGames; i++) {
                 String home = predictions[i][0];
@@ -525,7 +452,9 @@ public class BowlMain
                 //iterate through list of games to find a match
                 for (int j = 0; j < rows.length; j++) {
 
-                    if (!rows[j].toLowerCase().contains(home.toLowerCase()) && !rows[j].toLowerCase().contains(away.toLowerCase())) {
+                    if (rows[j].startsWith("=====")) {
+                        break;
+                    } else if (!rows[j].toLowerCase().contains(home.toLowerCase()) || !rows[j].toLowerCase().contains(away.toLowerCase())) {
                         continue;
                     }
 
@@ -593,8 +522,7 @@ public class BowlMain
                         }
                     }
                     predictions[i][8] = String.valueOf(averageSpread);
-
-
+                    break;
                 }
             }
         }
@@ -608,80 +536,76 @@ public class BowlMain
     public static void grabSpread() {
         System.out.println( "Fetching '" + inputSpread + "'");
 
-        //Instantiate client and method
-        HttpClient client = new DefaultHttpClient();
-        HttpGet method = new HttpGet(inputSpread);
-
-        //Execute client with our method
         try
         {
-            HttpResponse response = client.execute(method);
+            Document page = Jsoup.connect(inputSpread).get();
+            Elements rows = page.select("table[class=frodds-data-tbl] tr");
 
-            String source = EntityUtils.toString(response.getEntity());
-            String[] rows = source.split("<table")[14].replaceAll("\n","").replaceAll("\t","").split("<tr>");
-
-            for (int i = 1; i < rows.length; i = i+2) {
-                String firstRow = rows[i];
-                String teamOne = null;
-
-                try {
-                    teamOne = cleanTeamName(firstRow.split("<a href=\"")[1].split(">")[1].split("</a")[0]);
-                } catch (IndexOutOfBoundsException e) {
-                    i = i - 3;
+            for (int i = 0; i < rows.size(); i = i+2) {
+                Element current = rows.get(i);
+                Elements fiveDimes = current.select("a[href$=#BU]");
+                if (fiveDimes.size() == 0) {
+                    //no spread posted, reset index
+                    i--;
                     continue;
                 }
-                String teamTwo = cleanTeamName(firstRow.split("<a href=\"")[2].split(">")[1].split("</a")[0]);
 
-                String [] spreadParts;
-                try {
-                    spreadParts = Arrays.copyOfRange(HtmlEscape.unescapeHtml(firstRow.split("<a class=\"cellTextNorm\" href=\"")[firstRow.split("<a class=\"cellTextNorm\" href=\"").length - 1]
-                            .split("_blank\">")[1].split("</a>")[0]).split("<br>"), 1, 3);
-                } catch (IndexOutOfBoundsException ex) {
-                    continue;
-                }
+                String teamOne = cleanTeamName(current.select("a[class=tabletext]").get(0).childNode(0).toString());
+                String teamTwo = cleanTeamName(current.select("a[class=tabletext]").get(1).childNode(0).toString());
+
+                List<String> spreadParts = current.select("a[href$=#BU]").get(0).childNodes().stream()
+                        .filter(n -> (n instanceof TextNode))
+                        .map(n -> HtmlEscape.unescapeHtml(n.toString().replace("PK","-0")))
+                        .collect(toList())
+                        .subList(1,3);
 
                 boolean teamOneIsFavorite;
-                double spread = 0.0;
-                if (spreadParts[0] == null) {
-                    continue;
-                }
-                else if (spreadParts[0].startsWith("-")) {
+                Double spread = null;
+                if (spreadParts.get(0).startsWith("-")) {
                     teamOneIsFavorite = true;
-                    String spreadString = spreadParts[0].split("-|\\+|EV")[1].replace("½", ".5").replace(" EV", "");
-                    spread = Double.valueOf(spreadString.substring(0, spreadString.length()-1));
+                    if (StringUtils.isNotEmpty(spreadParts.get(0)) && !spreadParts.get(0).equals(" ")) {
+                        String spreadString = spreadParts.get(0).split("-|\\+|EV")[1].replace("½", ".5").replace(" EV", "");
+                        spread = Double.valueOf(spreadString.substring(0, spreadString.length() - 1));
+                    }
                 } else {
                     teamOneIsFavorite = false;
-                    String spreadString = spreadParts[1].split("-|\\+|EV")[1].replace("½", ".5").replace(" EV", "");
-                    spread = Double.valueOf(spreadString.substring(0, spreadString.length()-1)) * -1.0;
-                }
-
-                //Find a spot in our array for these values
-                int actualRow = -1;
-                for (int j = 0; j < numGames; j++) {
-                    double homeResult =  similarity(predictions[j][0], teamTwo);
-                    double awayResult =  similarity(predictions[j][1], teamOne);
-                    if (homeResult == 1 || awayResult == 1) {
-                        actualRow = j;
-                        predictions[actualRow][11] = String.valueOf(spread);
-                        //maybe the two are reversed?
-                    } else {
-                        homeResult =  similarity(predictions[j][0], teamOne);
-                        awayResult =  similarity(predictions[j][1], teamTwo);
-
-                        if (homeResult == 1 || awayResult == 1) {
-                            String third = teamOne;
-                            teamOne = teamTwo;
-                            teamTwo = third;
-                            spread = spread * -1.0;
-                            actualRow = j;
-                            predictions[actualRow][11] = String.valueOf(spread);
-                        }
+                    if (StringUtils.isNotEmpty(spreadParts.get(1)) && !spreadParts.get(1).equals(" ")) {
+                        String spreadString = spreadParts.get(1).split("-|\\+|EV")[1].replace("½", ".5").replace(" EV", "");
+                        spread = Double.valueOf(spreadString.substring(0, spreadString.length() - 1)) * -1.0;
                     }
                 }
-                if (actualRow < 0) {
-                    actualRow = askForRow(11, teamOne, teamTwo);
-                    if (actualRow >= 0) {
-                        predictions[actualRow][11] = String.valueOf(spread);
+
+                if (spread != null) {
+                    //Find a spot in our array for these values
+                    int actualRow = -1;
+                    for (int j = 0; j < numGames; j++) {
+                        double homeResult = similarity(predictions[j][0], teamTwo);
+                        double awayResult = similarity(predictions[j][1], teamOne);
+                        if (homeResult == 1 || awayResult == 1) {
+                            actualRow = j;
+                            predictions[actualRow][11] = String.valueOf(spread);
+                            break;
+                            //maybe the two are reversed?
+                        } else {
+                            homeResult = similarity(predictions[j][0], teamTwo);
+                            awayResult = similarity(predictions[j][1], teamOne);
+
+                            if (homeResult == 1 || awayResult == 1) {
+                                String third = teamOne;
+                                teamOne = teamTwo;
+                                teamTwo = third;
+                                spread = spread * -1.0;
+                                actualRow = j;
+                                predictions[actualRow][11] = String.valueOf(spread);
+                                break;
+                            }
+                        }
+                    }
+                    if (actualRow < 0) {
+                        actualRow = askForRow(11, teamOne, teamTwo);
+                        if (actualRow >= 0) {
+                            predictions[actualRow][11] = String.valueOf(spread);
+                        }
                     }
                 }
             }
@@ -763,26 +687,21 @@ public class BowlMain
     public static void grabAtomic() {
         System.out.println("Fetching '" + inputAtomic + "'");
 
-        //Instantiate client and method
-        HttpClient client = new DecompressingHttpClient();
-        HttpGet method = new HttpGet(inputAtomic);
-
-        //Execute client with our method
         try {
 
-            HttpResponse response = client.execute(method);
+            Document page = Jsoup.connect(inputAtomic).get();
+            Elements rows = page.select("a[name=IA]").get(0).nextElementSibling().nextElementSibling().select("tr");
+            DateTime currentDate = new DateTime();
+            DateTime thisPastMonday = new DateTime().withWeekyear(currentDate.getWeekyear()).withYear(2017).withDayOfWeek(1).withHourOfDay(0);
+            DateTime inAWeek = thisPastMonday.plusWeeks(1);
 
-            String source = EntityUtils.toString(response.getEntity());
-            String[] rows = source.replaceAll("\r","").replaceAll("\n","").split("<h2>FBS</h2>")[1].trim().split("</table>")[0].split("<tr>|<tr bgcolor=\"#edf3fe\">");
-            rows = Arrays.copyOfRange(rows, 1, rows.length);
-
-            for (String row : rows) {
-                String[] elements = row.split("<td>|<td align=\"left\">");
-                String date = elements[1].split("</td>")[0];
-                String away = cleanTeamName(elements[2].split(">")[1].split("</a")[0]);
-                String home = cleanTeamName(elements[4].split(">")[1].split("</a")[0]);
-                String awayScore = elements[3].split("</td>")[0];
-                String homeScore = elements[5].split("</td>")[0];
+            for (int i = 1; i < rows.size(); i++) {
+                Elements currentRowParts = rows.get(i).select("td");
+                String date = currentRowParts.get(0).childNode(0).toString();
+                String away = cleanTeamName(currentRowParts.get(1).childNode(0).childNode(0).toString());
+                String home = cleanTeamName(currentRowParts.get(3).childNode(0).childNode(0).toString());
+                String awayScore = currentRowParts.get(2).childNode(0).toString();
+                String homeScore = currentRowParts.get(4).childNode(0).toString();
                 String margin = String.valueOf(Integer.valueOf(awayScore) - Integer.valueOf(homeScore));
 
                 DateTimeFormatter format = DateTimeFormat.forPattern("MM/dd");
@@ -826,7 +745,6 @@ public class BowlMain
                     }
                 }
             }
-
         } catch (Exception e) {
             e.printStackTrace(System.out);
             System.exit(0);
@@ -869,19 +787,11 @@ public class BowlMain
 
     }
 
-    public static String cleanTeamName(String teamName) {
-        return teamName.replaceAll(" St$"," State").replaceFirst("E ", "Eastern ").replaceFirst("^C ", "Central ").replace("&amp;","&")
-                .replace("FL ", "Florida ").replaceAll("Intl$", "International").replace("FIU","Florida International").replace("AM","A&M").replace("NC ", "North Carolina ")
-                .replaceAll(" St.$"," State").replace("<b>","").replace("</b>","").replaceFirst("^W ", "Western ").replaceFirst("^Ga ", "Georgia ")
-                .replace("N Illinois","Northern Illinois").replace("Kent","Kent State").replaceAll("^ULM$","Louisiana Monroe").replaceAll("^ULL$","Louisiana Lafayette")
-                .replace("Louisiana-Monroe", "Louisiana Monroe").replace("Louisiana-Lafayette", "Louisiana Lafayette").trim();
-    }
-
     public static void printResults() {
         BufferedWriter bw = null;
 
         try {
-            File file = new File("/Users/patrick.stoneburner/Desktop/ncaa_picks.csv");
+            File file = new File("/Users/patrick.stoneburner/Desktop/bowl_picks.csv");
             if (!file.exists()) {
                 file.createNewFile();
             }
