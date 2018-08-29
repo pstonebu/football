@@ -7,30 +7,35 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 import org.joda.time.DateTime;
-import org.joda.time.Weeks;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.jsoup.HttpStatusException;
-import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.nodes.Node;
 import org.jsoup.nodes.TextNode;
 import org.jsoup.select.Elements;
-import org.unbescape.html.HtmlEscape;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import java.io.*;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 
+import static java.lang.Double.valueOf;
+import static java.lang.Math.abs;
+import static java.lang.String.format;
 import static java.net.URLEncoder.encode;
+import static java.util.Arrays.asList;
+import static java.util.Arrays.copyOfRange;
 import static java.util.stream.Collectors.toList;
+import static org.apache.commons.lang.WordUtils.capitalizeFully;
+import static org.joda.time.Weeks.weeksBetween;
+import static org.jsoup.Jsoup.connect;
+import static org.unbescape.html.HtmlEscape.unescapeHtml;
 
 public class NCAAMain
 {
@@ -40,25 +45,27 @@ public class NCAAMain
     public static int numGames = 0;
     public static String inputURIPR = "https://thepowerrank.com/predictions/";
     public static String inputURIDR = "http://www.dratings.com/predictor/ncaa-football-predictions/";
-    public static String inputURIOS = "http://www.oddsshark.com/ncaaf/computer-picks";
-    public static String inputURIFox = "";
-    public static String inputSP = "https://www.footballstudyhall.com/pages/2017-%team%-advanced-statistical-profile";
+    public static String inputURIOS = "https://www.oddsshark.com/ncaaf/computer-picks";
+    public static String inputURIFox = "https://www.foxsports.com/college-football/predictions?season=2018&seasonType=1&week=%d&group=-3";
+    public static String inputSP = "https://www.footballstudyhall.com/pages/2018-%team%-advanced-statistical-profile";
     public static String inputSagarin = "http://sagarin.com/sports/cfsend.htm";
     public static String inputMassey = "http://www.masseyratings.com/predjson.php?s=cf&sub=11604&dt=$dt$";
     public static String inputSpread = "http://www.vegasinsider.com/college-football/odds/offshore/2/";
-    public static String input538 = "http://projects.fivethirtyeight.com/2017-college-football-predictions/sims.csv";
+    public static String input538 = "http://projects.fivethirtyeight.com/2018-college-football-predictions/sims.csv";
     public static String inputAtomic = "http://www.atomicfootball.com/archive/af_predictions_All.html";
 
     public static void main( String[] args )
     {
         //What week of the season is it?
-        DateTime game1 = new DateTime(1504368000000l);
+        DateTime game1 = new DateTime(1535760000000l);
         DateTime today = new DateTime();
-        week = Weeks.weeksBetween(game1, today).getWeeks()+2;
-        inputURIFox = String.format("http://www.foxsports.com/college-football/predictions?season=2017&seasonType=1&week=%d&group=-3",week);
+        week = weeksBetween(game1, today).getWeeks()+2;
+        inputURIFox = format(inputURIFox, week);
 
         DateTimeFormatter dtfOut = DateTimeFormat.forPattern("yyyyMMdd");
-        inputMassey = inputMassey.replace("$dt$", dtfOut.print(today));
+        inputMassey = inputMassey.replace("$dt$", "20180830");
+        // TODO uncomment
+        //inputMassey = inputMassey.replace("$dt$", dtfOut.print(today));
 
         grabPowerRank();
         grabAtomic();
@@ -66,7 +73,7 @@ public class NCAAMain
         grabSpread();
         grabSagarin();
         grabMassey();
-        grabSandP();
+        //grabSandP();
         grabDRatings();
         grabFox();
         grabOddsShark();
@@ -82,16 +89,19 @@ public class NCAAMain
         //Execute client with our method
         try
         {
-            Document page = Jsoup.connect(inputURIPR).get();
+            Document page = connect(inputURIPR).get();
             Element ncaaHeader = page.select("h2").stream()
-                    .filter(e -> e.toString().contains("College Football,"))
+                    .filter(e -> e.toString().contains("College Football"))
                     .findFirst()
                     .orElse(null);
             Element current = ncaaHeader.nextElementSibling().nextElementSibling().nextElementSibling();
 
             while (current.nextElementSibling() != null) {
                 current = current.nextElementSibling();
-                if (!current.tagName().equals("p")) {
+                if (current.tagName().equals("h4")) {
+                    continue;
+                }
+                else if (!current.tagName().equals("p")) {
                     break;
                 }
 
@@ -99,6 +109,11 @@ public class NCAAMain
                         .replaceAll("[0-9]*","").replaceAll("\\.","").trim();
                 String away = cleanTeamName(teamsString.split("(\\bat\\b|\\bversus\\b)")[0].trim());
                 String home = cleanTeamName(teamsString.split("(\\bat\\b|\\bversus\\b)")[1].trim());
+
+                //TODO don't do this
+                if ((away.equals("Wyoming") && home.equals("New Mexico State")) || (away.equals("Hawaii") && home.equals("Colorado State"))) {
+                    continue;
+                }
 
                 Node summary = current.childNodes().get(2);
                 boolean negative = summary.toString().startsWith(home);
@@ -125,21 +140,21 @@ public class NCAAMain
 
         try
         {
-            Document page = Jsoup.connect(inputURIDR).get();
+            Document page = connect(inputURIDR).get();
             Elements rows = page.select("table[class=small-text]").get(1).select("tr");
 
             for (int i = 2; i < rows.size(); i = i + 2) {
                 Element rowOne = rows.get(i);
                 Element rowTwo = rows.get(i+1);
 
-                String away = rowOne.select("td").get(2).childNodes().get(0).toString();
-                String home = rowTwo.select("td").get(0).childNodes().get(0).toString();
+                String away = cleanTeamName(rowOne.select("td").get(2).childNodes().get(0).toString());
+                String home = cleanTeamName(rowTwo.select("td").get(0).childNodes().get(0).toString());
 
                 //Grab spread, and favorite
                 String homePoints = rowTwo.select("td").get(5).childNodes().get(0).childNodes().get(0).toString().trim();
                 String awayPoints = rowOne.select("td").get(7).childNodes().get(0).childNodes().get(0).toString().trim();
 
-                double margin = Double.valueOf(awayPoints) - Double.valueOf(homePoints);
+                double margin = valueOf(awayPoints) - valueOf(homePoints);
 
                 //Find a spot in our array for these values
                 for (int j = 0; j < numGames; j++) {
@@ -147,6 +162,12 @@ public class NCAAMain
                     double awayResult =  similarity(predictions[j][1], away);
                     if (homeResult == 1 || awayResult == 1) {
                         predictions[j][3] = String.valueOf(margin);
+                    } else {
+                        homeResult = similarity(predictions[j][0], away);
+                        awayResult = similarity(predictions[j][1], home);
+                        if (homeResult == 1 || awayResult == 1) {
+                            predictions[j][3] = String.valueOf(margin * -1.0);
+                        }
                     }
                 }
             }     
@@ -163,7 +184,7 @@ public class NCAAMain
 
         try
         {
-            Document page = Jsoup.connect(inputURIFox).get();
+            Document page = connect(inputURIFox).get();
             Elements games = page.select("div[class=wisbb_predictionChip]");
 
             for (Element game : games) {
@@ -220,18 +241,17 @@ public class NCAAMain
 
         try
         {
-            Document page = Jsoup.connect(inputURIOS).get();
+            Document page = connect(inputURIOS).get();
             Elements games = page.select("table");
 
             for (int i = 0; i < games.size(); i++) {
                 Element game = games.get(i);
-                List<Node> teams = game.select("caption")
-                        .get(0).select("caption").get(0).childNodes();
-                if (teams.size() < 3) {
+                Elements teams = game.getElementsByClass("name-long");
+                if (teams.size() != 2) {
                     continue;
                 }
-                String away = cleanTeamName(teams.get(0).toString().trim());
-                String home = cleanTeamName(teams.get(2).toString().trim());
+                String away = cleanTeamName(teams.get(0).childNodes().get(0).toString().trim());
+                String home = cleanTeamName(teams.get(1).childNodes().get(0).toString().trim());
                 String prediction = game.select("td").get(1).childNode(0).toString();
 
                 ScriptEngineManager mgr = new ScriptEngineManager();
@@ -304,7 +324,7 @@ public class NCAAMain
             try {
                 Document page = null;
                 try {
-                    page = Jsoup.connect(homeTeamFailure ? awayUrl : homeUrl).get();
+                    page = connect(homeTeamFailure ? awayUrl : homeUrl).get();
                 } catch (HttpStatusException ex) {
                     if (ex.getStatusCode() >= 300) {
                         if (!homeTeamFailure) {
@@ -325,7 +345,7 @@ public class NCAAMain
                 for (int j = 1; j < predictionsRows.size()+1; j++) {
                     Element currentPrediction = predictionsRows.get(j);
                     DateTime currentDate = new DateTime();
-                    DateTime thisPastMonday = new DateTime().withWeekyear(currentDate.getWeekyear()).withYear(2017).withDayOfWeek(1).withHourOfDay(0);
+                    DateTime thisPastMonday = new DateTime().withWeekyear(currentDate.getWeekyear()).withYear(2018).withDayOfWeek(1).withHourOfDay(0);
                     DateTime inAWeek = thisPastMonday.plusWeeks(1);
 
                     String nextGameString = currentPrediction.select("td").get(0).childNode(0).toString().trim();
@@ -367,7 +387,7 @@ public class NCAAMain
             String source = EntityUtils.toString(response.getEntity());
 
             JSONObject json = new JSONObject(source);
-            JSONArray gamesArray = (JSONArray) json.get("DI");
+            JSONArray gamesArray = json.getJSONArray("DI");
 
             for (Object currentGame : gamesArray) {
                 JSONArray current = (JSONArray)currentGame;
@@ -428,9 +448,9 @@ public class NCAAMain
 
         try
         {
-            Document page = Jsoup.connect(inputSagarin).get();
+            Document page = connect(inputSagarin).get();
             Node predictionSection = page.select("a[name=New_Feature]").get(0).parent().parent().parent().childNode(2);
-            String[] rows = Arrays.copyOfRange(predictionSection.toString().split("\r\n"), 7,
+            String[] rows = copyOfRange(predictionSection.toString().split("\r\n"), 8,
                     predictionSection.toString().split("\r\n").length);
 
             for (int i = 0; i < numGames; i++) {
@@ -446,53 +466,32 @@ public class NCAAMain
                         continue;
                     }
 
-                    //if home and away aren't in this row, then skip
-                    String[] elements = rows[j].split("\\s+");
-                    String favorite = elements[0];
-                    int favoritePieces = 1;
-                    try {
-                        Double.parseDouble(elements[1]);
-                    } catch (NumberFormatException ex) {
-                        favorite = favorite + " " + elements[1];
-                        favoritePieces++;
+                    String currentRow = rows[j];
+                    String favorite = currentRow.substring(4, 27).trim();
+                    String underdog = currentRow.substring(59).trim();
 
-                        try {
-                            Double.parseDouble(elements[2]);
-                        } catch (NumberFormatException e) {
-                            favorite = favorite + " " + elements[2];
-                            favoritePieces++;
-                        }
-                    }
-                    Double averageSpread = (Double.valueOf(elements[favoritePieces]) + Double.valueOf(elements[favoritePieces+1]) +
-                            Double.valueOf(elements[favoritePieces+2]) + Double.valueOf(elements[favoritePieces+3])) / 4.0;
+                    String[] spreads = currentRow.substring(27, 59).trim().split("\\s+");
+                    double averageSpread = asList(spreads).stream().mapToDouble(Double::valueOf).average().getAsDouble();
 
-                    String underdog = elements[favoritePieces+4];
-                    if (StringUtils.isAllLowerCase(underdog)) {
-                        if (StringUtils.isAllLowerCase(elements[favoritePieces+5])) {
-                            underdog = underdog + " " + elements[favoritePieces+5];
-                            if (StringUtils.isAllLowerCase(elements[favoritePieces+6])) {
-                                underdog = underdog + " " + elements[favoritePieces+6];
-                            }
-                        }
-                    } else if (StringUtils.isAllUpperCase(underdog)) {
-                        if (StringUtils.isAllUpperCase(elements[favoritePieces+5])) {
-                            underdog = underdog + " " + elements[favoritePieces+5];
-                            if (StringUtils.isAllUpperCase(elements[favoritePieces+6])) {
-                                underdog = underdog + " " + elements[favoritePieces+6];
-                            }
-                        }
-                    }
+                    //neutral site game
+                    if (currentRow.substring(0,3).contains("n")) {
+                        favorite = capitalizeFully(favorite);
+                        underdog = capitalizeFully(underdog);
 
-                    boolean homeIsFavorite = favorite.equals(favorite.toUpperCase());
-
-                    if (homeIsFavorite) {
-                        if (!favorite.toUpperCase().equals(home.toUpperCase()) && !underdog.toUpperCase().equals(away.toUpperCase())) {
-                            continue;
+                        if (favorite.equals(home) || underdog.equals(away)) {
+                            averageSpread = averageSpread * -1.0;
                         }
-                        averageSpread = averageSpread * -1.0;
                     } else {
-                        if (!favorite.toUpperCase().equals(away.toUpperCase()) && !underdog.toUpperCase().equals(home.toUpperCase())) {
-                            continue;
+                        if (favorite.equals(favorite.toUpperCase())) {
+                            if (!favorite.toUpperCase().equals(home.toUpperCase()) && !underdog.toUpperCase().equals(away.toUpperCase())) {
+                                continue;
+                            }
+                            averageSpread = averageSpread * -1.0;
+                        } else {
+                            if (!favorite.toUpperCase().equals(away.toUpperCase()) && !underdog.toUpperCase().equals
+                                    (home.toUpperCase())) {
+                                continue;
+                            }
                         }
                     }
                     predictions[i][8] = String.valueOf(averageSpread);
@@ -512,15 +511,14 @@ public class NCAAMain
 
         try
         {
-            Document page = Jsoup.connect(inputSpread).get();
+            Document page = connect(inputSpread).get();
             Elements rows = page.select("table[class=frodds-data-tbl] tr");
 
-            for (int i = 0; i < rows.size(); i = i+2) {
+            for (int i = 0; i < rows.size(); i++) {
                 Element current = rows.get(i);
                 Elements fiveDimes = current.select("a[href$=#BU]");
                 if (fiveDimes.size() == 0) {
-                    //no spread posted, reset index
-                    i--;
+                    //if this is just an info row or there's no spread posted, move on
                     continue;
                 }
 
@@ -529,7 +527,7 @@ public class NCAAMain
 
                 List<String> spreadParts = current.select("a[href$=#BU]").get(0).childNodes().stream()
                         .filter(n -> (n instanceof TextNode))
-                        .map(n -> HtmlEscape.unescapeHtml(n.toString().replace("PK","-0")))
+                        .map(n -> unescapeHtml(n.toString().replace("PK","-0")))
                         .collect(toList())
                         .subList(1,3);
 
@@ -539,13 +537,13 @@ public class NCAAMain
                     teamOneIsFavorite = true;
                     if (StringUtils.isNotEmpty(spreadParts.get(0)) && !spreadParts.get(0).equals(" ")) {
                         String spreadString = spreadParts.get(0).split("-|\\+|EV")[1].replace("½", ".5").replace(" EV", "");
-                        spread = Double.valueOf(spreadString.substring(0, spreadString.length() - 1));
+                        spread = abs(valueOf(spreadString.substring(0, spreadString.length() - 1)));
                     }
                 } else {
                     teamOneIsFavorite = false;
                     if (StringUtils.isNotEmpty(spreadParts.get(1)) && !spreadParts.get(1).equals(" ")) {
                         String spreadString = spreadParts.get(1).split("-|\\+|EV")[1].replace("½", ".5").replace(" EV", "");
-                        spread = Double.valueOf(spreadString.substring(0, spreadString.length() - 1)) * -1.0;
+                        spread = abs(valueOf(spreadString.substring(0, spreadString.length() - 1)));
                     }
                 }
 
@@ -557,20 +555,16 @@ public class NCAAMain
                         double awayResult = similarity(predictions[j][1], teamOne);
                         if (homeResult == 1 || awayResult == 1) {
                             actualRow = j;
-                            predictions[actualRow][11] = String.valueOf(spread);
+                            predictions[actualRow][11] = String.valueOf(spread * (teamOneIsFavorite ? 1.0 : -1.0));
                             break;
                             //maybe the two are reversed?
                         } else {
-                            homeResult = similarity(predictions[j][0], teamTwo);
-                            awayResult = similarity(predictions[j][1], teamOne);
+                            homeResult = similarity(predictions[j][0], teamOne);
+                            awayResult = similarity(predictions[j][1], teamTwo);
 
                             if (homeResult == 1 || awayResult == 1) {
-                                String third = teamOne;
-                                teamOne = teamTwo;
-                                teamTwo = third;
-                                spread = spread * -1.0;
                                 actualRow = j;
-                                predictions[actualRow][11] = String.valueOf(spread);
+                                predictions[actualRow][11] = String.valueOf(spread * (teamOneIsFavorite ? -1.0 : 1.0));
                                 break;
                             }
                         }
@@ -654,7 +648,6 @@ public class NCAAMain
 
         } catch (Exception e) {
             e.printStackTrace(System.out);
-            System.exit(0);
         }
     }
 
@@ -663,11 +656,12 @@ public class NCAAMain
 
         try {
 
-            Document page = Jsoup.connect(inputAtomic).get();
+            Document page = connect(inputAtomic).get();
             Elements rows = page.select("a[name=IA]").get(0).nextElementSibling().nextElementSibling().select("tr");
             DateTime currentDate = new DateTime();
-            DateTime thisPastMonday = new DateTime().withWeekyear(currentDate.getWeekyear()).withYear(2017).withDayOfWeek(1).withHourOfDay(0);
-            DateTime inAWeek = thisPastMonday.plusWeeks(1);
+            DateTime thisPastMonday = new DateTime().withWeekyear(currentDate.getWeekyear()).withYear(2018).withDayOfWeek(1).withHourOfDay(0);
+            //TODO back to one week
+            DateTime inAWeek = thisPastMonday.plusWeeks(1).plusDays(1);
 
             for (int i = 1; i < rows.size(); i++) {
                 Elements currentRowParts = rows.get(i).select("td");
@@ -711,7 +705,8 @@ public class NCAAMain
                     }
                 }
                 if (actualRow < 0) {
-                    actualRow = askForRow(10, home, away);
+                    //TODO, put this back?
+                    //actualRow = askForRow(10, home, away);
                     if (actualRow >= 0) {
                         predictions[actualRow][10] = margin;
                     }
@@ -729,10 +724,10 @@ public class NCAAMain
         try {
             br = new BufferedReader(new InputStreamReader(System.in));
 
-            System.out.println(String.format("Which game is %s vs. %s? ", args[0], args[1]));
+            System.out.println(format("Which game is %s vs. %s? ", args[0], args[1]));
             for (int i = 0; i < numGames; i++) {
                 if (predictions[i][column] == null) {
-                    System.out.println(String.format("%d) %s vs. %s", i, predictions[i][0], predictions[i][1]));
+                    System.out.println(format("%d) %s vs. %s", i, predictions[i][0], predictions[i][1]));
                 }
             }
             String input = br.readLine();
@@ -742,6 +737,8 @@ public class NCAAMain
         } catch (IOException e) {
             e.printStackTrace(System.out);
             System.exit(0);
+        } catch (NumberFormatException e) {
+            return -1;
         }
         return -1;
     }
@@ -767,7 +764,8 @@ public class NCAAMain
                 .replace("Louisiana-Monroe", "Louisiana Monroe").replace("Louisiana-Lafayette", "Louisiana Lafayette").replace("Ohio U.", "Ohio")
                 .replace("Miami OH", "Miami (OH)").replace("Int'l", "International").replace("UCF", "Central Florida")
                 .replace("SMU", "Southern Methodist").replace("Middle Tennessee", "Middle Tennessee State").replace("Texas El Paso", "UTEP")
-                .replace("Texas-San Antonio", "UTSA").replace("Alabama-Birmingham", "UAB").trim();
+                .replace("Texas-San Antonio", "UTSA").replace("Alabama-Birmingham", "UAB").replace("Southern California", "USC")
+                .replace("Nevada-Las Vegas", "UNLV").replace("Louisiana State", "LSU").replace("Miami-FL", "Miami (FL)").trim();
     }
 
     public static void printResults() {
@@ -785,7 +783,7 @@ public class NCAAMain
             bw.newLine();
 
             for (int i = 0; i < numGames; i++) {
-                bw.write(String.format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", predictions[i][0], predictions[i][1],
+                bw.write(format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", predictions[i][0], predictions[i][1],
                         predictions[i][2] != null ? predictions[i][2] : "",
                         predictions[i][3] != null ? predictions[i][3] : "",
                         predictions[i][4] != null ? predictions[i][4] : "",
