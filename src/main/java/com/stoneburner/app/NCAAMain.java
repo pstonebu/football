@@ -63,9 +63,7 @@ public class NCAAMain
         inputURIFox = format(inputURIFox, week);
 
         DateTimeFormatter dtfOut = DateTimeFormat.forPattern("yyyyMMdd");
-        inputMassey = inputMassey.replace("$dt$", "20180830");
-        // TODO uncomment
-        //inputMassey = inputMassey.replace("$dt$", dtfOut.print(today));
+        inputMassey = inputMassey.replace("$dt$", dtfOut.print(today));
 
         grabPowerRank();
         grabAtomic();
@@ -660,8 +658,7 @@ public class NCAAMain
             Elements rows = page.select("a[name=IA]").get(0).nextElementSibling().nextElementSibling().select("tr");
             DateTime currentDate = new DateTime();
             DateTime thisPastMonday = new DateTime().withWeekyear(currentDate.getWeekyear()).withYear(2018).withDayOfWeek(1).withHourOfDay(0);
-            //TODO back to one week
-            DateTime inAWeek = thisPastMonday.plusWeeks(1).plusDays(1);
+            DateTime inAWeek = thisPastMonday.plusWeeks(1);
 
             for (int i = 1; i < rows.size(); i++) {
                 Elements currentRowParts = rows.get(i).select("td");
