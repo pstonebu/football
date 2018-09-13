@@ -32,6 +32,7 @@ import static java.net.URLEncoder.encode;
 import static java.util.Arrays.asList;
 import static java.util.Arrays.copyOfRange;
 import static java.util.stream.Collectors.toList;
+import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.apache.commons.lang.WordUtils.capitalizeFully;
 import static org.joda.time.Weeks.weeksBetween;
 import static org.jsoup.Jsoup.connect;
@@ -458,7 +459,7 @@ public class NCAAMain
                 //iterate through list of games to find a match
                 for (int j = 0; j < rows.length; j++) {
 
-                    if (rows[j].startsWith("=====")) {
+                    if (rows[j].startsWith("=====") || isBlank(rows[j])) {
                         break;
                     } else if (!rows[j].toLowerCase().contains(home.toLowerCase()) && !rows[j].toLowerCase().contains(away.toLowerCase())) {
                         continue;

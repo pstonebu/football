@@ -22,13 +22,15 @@ import org.unbescape.html.HtmlEscape;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import java.io.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
+import static java.util.Arrays.asList;
+import static java.util.Arrays.copyOfRange;
 import static java.util.stream.Collectors.toList;
+import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.apache.commons.lang.StringUtils.isEmpty;
+import static org.apache.commons.lang.WordUtils.capitalizeFully;
+import static org.jsoup.Jsoup.connect;
 
 public class NFLMain
 {
@@ -40,7 +42,7 @@ public class NFLMain
     public static String inputURIDR = "http://www.dratings.com/predictor/nfl-football-predictions/";
     public static String inputURIOS = "http://www.oddsshark.com/nfl/computer-picks";
     public static String inputURIFox = "http://www.foxsports.com/nfl/predictions";
-    public static String input538 = "https://projects.fivethirtyeight.com/2017-nfl-predictions/games/";
+    public static String input538 = "https://projects.fivethirtyeight.com/2018-nfl-predictions/games/";
     public static String inputSagarin = "http://sagarin.com/sports/nflsend.htm";
     public static String inputMassey = "http://www.masseyratings.com/predjson.php?s=nfl&dt=$dt$";
     public static String inputSpread = "http://www.vegasinsider.com/nfl/odds/offshore/2/";
@@ -183,7 +185,7 @@ public class NFLMain
         {
             Document page = Jsoup.connect(inputURIPR).get();
             Element nflHeader = page.select("h2").stream()
-                    .filter(e -> e.toString().contains("NFL,"))
+                    .filter(e -> e.toString().contains("NFL"))
                     .findFirst()
                     .orElse(null);
             Element current = nflHeader.nextElementSibling().nextElementSibling().nextElementSibling();
@@ -327,10 +329,9 @@ public class NFLMain
                 if (game.toString().contains("Results")) {
                     break;
                 }
-                List<Node> teams = game.select("caption")
-                        .get(0).select("caption").get(0).childNodes();
-                String away = cleanTeamName(teams.get(0).toString().trim());
-                String home = cleanTeamName(teams.get(2).toString().trim());
+                Elements teams = game.select("caption").get(0).getElementsByClass("name-long");
+                String away = cleanTeamName(teams.get(0).text().trim());
+                String home = cleanTeamName(teams.get(1).text().trim());
                 String prediction = game.select("td").get(1).childNode(0).toString();
 
                 ScriptEngineManager mgr = new ScriptEngineManager();
@@ -503,102 +504,65 @@ public class NFLMain
     public static void grabSagarin() {
         System.out.println( "Fetching '" + inputSagarin + "'");
 
-        //Instantiate client and method
-        HttpClient client = new DefaultHttpClient();
-        HttpGet method = new HttpGet(inputSagarin);
-
-        //Execute client with our method
         try
         {
-            HttpResponse response = client.execute(method);
-
-            String html = EntityUtils.toString(response.getEntity());
-
-            String[] rows = Arrays.copyOfRange(html.split("<a name=\"New_Feature\"><b>New_Feature</b></a></h2></font>")[1].split("\r\n"),
-                    7, numGames+7);
+            Document page = connect(inputSagarin).get();
+            Node predictionSection = page.select("a[name=Predictions]").get(0).parent().parent().parent().childNode(2);
+            String[] rows = copyOfRange(predictionSection.toString().split("\r\n"), 8,
+                    predictionSection.toString().split("\r\n").length);
 
             for (int i = 0; i < numGames; i++) {
-                String home = cleanTeamName(predictions[i][0]);
-                String away = cleanTeamName(predictions[i][1]);
+                String home = predictions[i][0];
+                String away = predictions[i][1];
 
                 //iterate through list of games to find a match
                 for (int j = 0; j < rows.length; j++) {
-
-                    if (!rows[j].toLowerCase().contains(home.toLowerCase()) && !rows[j].toLowerCase().contains(away.toLowerCase())) {
+                    String currentRow = rows[j];
+                    if (currentRow.startsWith("=====") || isBlank(currentRow) || currentRow.contains("eigen")) {
+                        break;
+                    } else if (!currentRow.toLowerCase().contains(home.toLowerCase()) && !currentRow.toLowerCase().contains(away.toLowerCase())) {
                         continue;
                     }
 
-                    //if home and away aren't in this row, then skip
-                    String[] elements = rows[j].split("\\s+");
-                    String favorite = elements[0];
-                    int favoritePieces = 1;
-                    try {
-                        Double.parseDouble(elements[1]);
-                    } catch (NumberFormatException ex) {
-                        if (teamwords.contains(elements[1].toLowerCase())) {
-                            favorite = favorite + " " + elements[1];
+
+                    String favorite = currentRow.substring(4, 27).trim();
+                    String underdog = currentRow.substring(59).trim();
+
+                    String[] spreads = currentRow.substring(27, 59).trim().split("\\s+");
+                    double averageSpread = asList(spreads).stream().mapToDouble(Double::valueOf).average().getAsDouble();
+
+                    home = addMascot(home);
+                    away = addMascot(away);
+
+                    //neutral site game
+                    if (currentRow.substring(0,3).contains("n")) {
+                        favorite = capitalizeFully(favorite);
+                        underdog = capitalizeFully(underdog);
+
+                        if (favorite.equals(home) || underdog.equals(away)) {
+                            averageSpread = averageSpread * -1.0;
                         }
-                        favoritePieces++;
-
-                        try {
-                            Double.parseDouble(elements[2]);
-                        } catch (NumberFormatException e) {
-                            if (teamwords.contains(elements[2].toLowerCase())) {
-                                favorite = favorite + " " + elements[2];
-                            }
-                            favoritePieces++;
-                        }
-                    }
-                    Double averageSpread = (Double.valueOf(elements[favoritePieces]) + Double.valueOf(elements[favoritePieces+1]) +
-                            Double.valueOf(elements[favoritePieces+2]) + Double.valueOf(elements[favoritePieces+3])) / 4.0;
-
-                    String underdog = elements[favoritePieces+4];
-                    if (StringUtils.isAllLowerCase(underdog)) {
-                        if (StringUtils.isAllLowerCase(elements[favoritePieces+5])) {
-                            if (teamwords.contains(elements[favoritePieces+5].toLowerCase())) {
-                                underdog = underdog + " " + elements[favoritePieces + 5];
-
-                                if (StringUtils.isAllLowerCase(elements[favoritePieces+6])) {
-                                    if (teamwords.contains(elements[favoritePieces+6].toLowerCase())) {
-                                        underdog = underdog + " " + elements[favoritePieces + 6];
-                                    }
-                                }
-                            }
-                        }
-                    } else if (StringUtils.isAllUpperCase(underdog)) {
-                        if (StringUtils.isAllUpperCase(elements[favoritePieces+5])) {
-                            if (teamwords.contains(elements[favoritePieces+5].toLowerCase())) {
-                                underdog = underdog + " " + elements[favoritePieces + 5];
-
-                                if (StringUtils.isAllUpperCase(elements[favoritePieces+6])) {
-                                    if (teamwords.contains(elements[favoritePieces+6].toLowerCase())) {
-                                        underdog = underdog + " " + elements[favoritePieces + 6];
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    boolean homeIsFavorite = favorite.equals(favorite.toUpperCase());
-
-                    if (homeIsFavorite) {
-                        if (!favorite.toUpperCase().equals(home.toUpperCase()) && !underdog.toUpperCase().equals(away.toUpperCase())) {
-                            continue;
-                        }
-                        averageSpread = averageSpread * -1.0;
                     } else {
-                        if (!favorite.toUpperCase().equals(away.toUpperCase()) && !underdog.toUpperCase().equals(home.toUpperCase())) {
-                            continue;
+                        if (favorite.equals(favorite.toUpperCase())) {
+                            if (!favorite.toUpperCase().equals(home.toUpperCase()) && !underdog.toUpperCase().equals(away.toUpperCase())) {
+                                continue;
+                            }
+                            averageSpread = averageSpread * -1.0;
+                        } else {
+                            if (!favorite.toUpperCase().equals(away.toUpperCase()) && !underdog.toUpperCase().equals
+                                    (home.toUpperCase())) {
+                                continue;
+                            }
                         }
                     }
                     predictions[i][8] = String.valueOf(averageSpread);
-
+                    break;
                 }
             }
         }
 
         catch (Exception e) {
-            e.printStackTrace(System.out);
+            System.out.println("Exception occurred: " + e);
             System.exit(0);
         }
     }
@@ -725,6 +689,18 @@ public class NFLMain
                 .replaceFirst("N.Y.", "New York")
                 .replaceFirst("LA", "Los Angeles")
                 .replaceFirst("L.A.", "Los Angeles");
+    }
+
+    private static String addMascot(String city) {
+        if (city.contains("Los Angeles")) {
+            return city;
+        }
+        for (Map.Entry<String,String> mascotAndCity : teamMascotToCity.entrySet()) {
+            if (mascotAndCity.getValue().equals(city)) {
+                return city + " " + mascotAndCity.getKey();
+            }
+        }
+        return city;
     }
 
     public static void printResults() {
