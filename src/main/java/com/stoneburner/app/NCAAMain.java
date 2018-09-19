@@ -448,7 +448,7 @@ public class NCAAMain
         try
         {
             Document page = connect(inputSagarin).get();
-            Node predictionSection = page.select("a[name=New_Feature]").get(0).parent().parent().parent().childNode(2);
+            Node predictionSection = page.select("a[name=Predictions]").get(0).parent().parent().parent().childNode(2);
             String[] rows = copyOfRange(predictionSection.toString().split("\r\n"), 8,
                     predictionSection.toString().split("\r\n").length);
 
@@ -458,14 +458,13 @@ public class NCAAMain
 
                 //iterate through list of games to find a match
                 for (int j = 0; j < rows.length; j++) {
-
-                    if (rows[j].startsWith("=====") || isBlank(rows[j])) {
+                    String currentRow = rows[j];
+                    if (currentRow.startsWith("=====") || isBlank(currentRow) || currentRow.contains("eigen")) {
                         break;
-                    } else if (!rows[j].toLowerCase().contains(home.toLowerCase()) && !rows[j].toLowerCase().contains(away.toLowerCase())) {
+                    } else if (!currentRow.toLowerCase().contains(home.toLowerCase()) && !currentRow.toLowerCase().contains(away.toLowerCase())) {
                         continue;
                     }
 
-                    String currentRow = rows[j];
                     String favorite = currentRow.substring(4, 27).trim();
                     String underdog = currentRow.substring(59).trim();
 

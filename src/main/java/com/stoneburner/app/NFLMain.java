@@ -188,7 +188,7 @@ public class NFLMain
                     .filter(e -> e.toString().contains("NFL"))
                     .findFirst()
                     .orElse(null);
-            Element current = nflHeader.nextElementSibling().nextElementSibling().nextElementSibling();
+            Element current = nflHeader.nextElementSibling().nextElementSibling();
 
             while (current.nextElementSibling() != null) {
                 current = current.nextElementSibling();
