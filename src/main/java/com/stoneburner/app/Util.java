@@ -663,6 +663,51 @@ public class Util {
         }
     }
 
+    public static void grabDRatings(boolean isNFL, String[][] predictions) {
+        String url = isNFL ? inputURIDRNFL : inputURIDRNCAA;
+        System.out.println( "Fetching '" + url + "'");
+
+        try
+        {
+            Document page = connect(url).get();
+            Elements rows = page.select("table[class=small-text]").get(1).select("tr");
+
+            for (int i = 2; i < rows.size(); i = i + 2) {
+                Element rowOne = rows.get(i);
+                Element rowTwo = rows.get(i+1);
+
+                String away = cleanNCAATeamName(rowOne.select("td").get(2).childNodes().get(0).toString());
+                String home = cleanNCAATeamName(rowTwo.select("td").get(0).childNodes().get(0).toString());
+
+                //Grab spread, and favorite
+                String homePoints = rowTwo.select("td").get(5).childNodes().get(0).childNodes().get(0).toString().trim();
+                String awayPoints = rowOne.select("td").get(7).childNodes().get(0).childNodes().get(0).toString().trim();
+
+                double margin = valueOf(awayPoints) - valueOf(homePoints);
+
+                //Find a spot in our array for these values
+                for (int j = 0; j < predictions.length; j++) {
+                    double homeResult =  similarity(predictions[j][0], home);
+                    double awayResult =  similarity(predictions[j][1], away);
+                    if (homeResult == 1 || awayResult == 1) {
+                        predictions[j][3] = String.valueOf(margin);
+                    } else {
+                        homeResult = similarity(predictions[j][0], away);
+                        awayResult = similarity(predictions[j][1], home);
+                        if (homeResult == 1 || awayResult == 1) {
+                            predictions[j][3] = String.valueOf(margin * -1.0);
+                        }
+                    }
+                }
+            }
+        }
+
+        catch (Exception e) {
+            e.printStackTrace(System.out);
+            System.exit(0);
+        }
+    }
+
     private static String addMascot(String city) {
         if (city.contains("Los Angeles")) {
             return city;
