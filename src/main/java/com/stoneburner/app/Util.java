@@ -730,6 +730,12 @@ public class Util {
                 String away = teams.get(0).childNode(0).toString();
                 String home = teams.get(1).childNode(0).toString();
 
+                if (isNFL) {
+                    away = teamMascotToCity.get(away);
+                    home = teamMascotToCity.get(home);
+                }
+
+
                 String score = game.select("span[class=wisbb_predData]").get(0).childNodes().get(0).toString();
                 ScriptEngineManager mgr = new ScriptEngineManager();
                 ScriptEngine engine = mgr.getEngineByName("JavaScript");
