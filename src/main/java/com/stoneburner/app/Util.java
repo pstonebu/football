@@ -670,14 +670,16 @@ public class Util {
         try
         {
             Document page = connect(url).get();
-            Elements rows = page.select("table[class=small-text]").get(1).select("tr");
+            Elements rows = page.select("table[class=small-text]").get(isNFL ? 1 : 0).select("tr");
 
             for (int i = 2; i < rows.size(); i = i + 2) {
                 Element rowOne = rows.get(i);
                 Element rowTwo = rows.get(i+1);
 
-                String away = cleanNCAATeamName(rowOne.select("td").get(2).childNodes().get(0).toString());
-                String home = cleanNCAATeamName(rowTwo.select("td").get(0).childNodes().get(0).toString());
+                String away = rowOne.select("td").get(2).childNodes().get(0).toString();
+                away = isNFL ? cleanNFLTeamName(away) : cleanNCAATeamName(away);
+                String home = rowTwo.select("td").get(0).childNodes().get(0).toString();
+                home = isNFL ? cleanNFLTeamName(home) : cleanNCAATeamName(home);
 
                 //Grab spread, and favorite
                 String homePoints = rowTwo.select("td").get(5).childNodes().get(0).childNodes().get(0).toString().trim();
