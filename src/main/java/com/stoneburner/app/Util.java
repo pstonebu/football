@@ -17,6 +17,8 @@ import org.jsoup.nodes.Node;
 import org.jsoup.nodes.TextNode;
 import org.jsoup.select.Elements;
 
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -698,6 +700,64 @@ public class Util {
                         awayResult = similarity(predictions[j][1], home);
                         if (homeResult == 1 || awayResult == 1) {
                             predictions[j][3] = String.valueOf(margin * -1.0);
+                        }
+                    }
+                }
+            }
+        }
+
+        catch (Exception e) {
+            e.printStackTrace(System.out);
+            System.exit(0);
+        }
+    }
+
+    public static void grabFox(boolean isNFL, String[][] predictions) {
+        String url = isNFL ? inputURIFoxNFL : inputURIFoxNCAA;
+        System.out.println( "Fetching '" + url + "'");
+
+        try
+        {
+            Document page = connect(url).get();
+            Elements games = page.select("div[class=wisbb_predictionChip]");
+
+            for (Element game : games) {
+                Elements teams = game.select("span[class=wisbb_teamName]");
+                if (teams.size() == 0) {
+                    continue;
+                }
+
+                String away = teams.get(0).childNode(0).toString();
+                String home = teams.get(1).childNode(0).toString();
+
+                String score = game.select("span[class=wisbb_predData]").get(0).childNodes().get(0).toString();
+                ScriptEngineManager mgr = new ScriptEngineManager();
+                ScriptEngine engine = mgr.getEngineByName("JavaScript");
+                Object result = engine.eval(score);
+                double prediction;
+                if (result instanceof Integer) {
+                    prediction = (double)((Integer)result);
+                } else {
+                    prediction = (Double)result;
+                }
+
+                for (int j = 0; j < predictions.length; j++) {
+                    double homeResult =  similarity(predictions[j][0], home);
+                    double awayResult =  similarity(predictions[j][1], away);
+                    if (homeResult == 1 || awayResult == 1) {
+                        predictions[j][4] = String.valueOf(prediction);
+                        break;
+                    } else {
+                        homeResult =  similarity(predictions[j][0], away);
+                        awayResult =  similarity(predictions[j][1], home);
+
+                        if (homeResult == 1 || awayResult == 1) {
+                            String third = home;
+                            home = away;
+                            away = third;
+                            prediction = prediction * -1.0;
+                            predictions[j][4] = String.valueOf(prediction);
+                            break;
                         }
                     }
                 }
