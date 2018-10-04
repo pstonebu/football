@@ -533,18 +533,25 @@ public class Util {
 
             for (Object currentGame : gamesArray) {
                 JSONArray current = (JSONArray)currentGame;
-                String away = (String)((JSONArray)current.get(2)).get(0);
+                String away = current.getJSONArray(2).getString(0);
                 away = isNFL ? cleanNFLTeamName(away) : cleanNCAATeamName(away);
-                String home = ((String)((JSONArray)current.get(3)).get(0)).replace("@ ", "");
+                String home = current.getJSONArray(3).getString(0).replace("@ ", "");
                 home = isNFL ? cleanNFLTeamName(home) : cleanNCAATeamName(home);
-                double spread;
+                Double spread = null;
                 Object prediction = ((JSONArray)current.get(12)).get(0);
                 if (prediction instanceof Integer) {
                     spread = (double)((Integer)prediction) * -1.0;
                 } else if (prediction instanceof Double) {
                     spread = (Double)prediction * -1.0;
-                } else {
-                    continue;
+                } else if (prediction instanceof String && prediction.equals("---")) {
+                    Object innerprediction = ((JSONArray)current.get(13)).get(0);
+                    if (innerprediction instanceof Integer) {
+                        spread = (double)((Integer)innerprediction);
+                    } else if (innerprediction instanceof Double) {
+                        spread = (Double)innerprediction;
+                    } else {
+                        continue;
+                    }
                 }
 
                 //Find a spot in our array for these values
@@ -577,8 +584,6 @@ public class Util {
                     }
                 }
             }
-
-
         }
 
         catch (Exception e) {
