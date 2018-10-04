@@ -10,6 +10,7 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.jsoup.HttpStatusException;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.nodes.Node;
@@ -19,6 +20,7 @@ import org.jsoup.select.Elements;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +29,7 @@ import java.util.Map;
 import static java.lang.Double.valueOf;
 import static java.lang.Math.abs;
 import static java.lang.String.format;
+import static java.net.URLEncoder.encode;
 import static java.util.Arrays.asList;
 import static java.util.Arrays.copyOfRange;
 import static java.util.Locale.ENGLISH;
@@ -589,6 +592,74 @@ public class Util {
         catch (Exception e) {
             e.printStackTrace(System.out);
             System.exit(0);
+        }
+    }
+
+    public static void grabSandP(String[][] predictions) {
+        boolean homeTeamFailure = false;
+        boolean awayTeamFailure = false;
+        for (int i = 0; i < predictions.length; i++) {
+            String homeTeam = predictions[i][0];
+            String awayTeam = predictions[i][1];
+            String homeUrl;
+            String awayUrl;
+            try {
+                homeUrl = inputSP.replaceAll("%team%", encode(homeTeam.toLowerCase(), "UTF-8").replace("+", "-"));
+                awayUrl = inputSP.replaceAll("%team%", encode(awayTeam.toLowerCase(), "UTF-8").replace("+", "-"));
+            } catch (UnsupportedEncodingException e) {
+                break;
+            }
+
+            System.out.println("Fetching '" + (homeTeamFailure ? awayUrl : homeUrl) + "'");
+
+            try {
+                Document page = null;
+                try {
+                    page = connect(homeTeamFailure ? awayUrl : homeUrl).get();
+                } catch (HttpStatusException ex) {
+                    if (ex.getStatusCode() >= 300) {
+                        if (!homeTeamFailure) {
+                            --i;
+                        }
+                        homeTeamFailure = !homeTeamFailure;
+                        continue;
+                    }
+                }
+
+                Element predictionTable = page.select("table").get(1);
+                if (!predictionTable.toString().contains("Cumulative")) {
+                    System.out.println("The second table didn't look like the predictions table, continuing on.");
+                    continue;
+                }
+
+                Elements predictionsRows = predictionTable.select("tr");
+                for (int j = 1; j < predictionsRows.size()+1; j++) {
+                    Element currentPrediction = predictionsRows.get(j);
+                    DateTime currentDate = new DateTime();
+                    DateTime thisPastMonday = new DateTime().withWeekyear(currentDate.getWeekyear()).withYear(2018).withDayOfWeek(1).withHourOfDay(0);
+                    DateTime inAWeek = thisPastMonday.plusWeeks(1);
+
+                    String nextGameString = currentPrediction.select("td").get(0).childNode(0).toString().trim();
+                    DateTimeFormatter format = DateTimeFormat.forPattern("d-MMM");
+                    DateTime gameDate = format.withLocale(ENGLISH).parseDateTime(nextGameString).withYear(thisPastMonday.getYear()).withHourOfDay(22);
+
+                    if (gameDate.getMillis() < thisPastMonday.getMillis() || gameDate.getMillis() > inAWeek.getMillis()) {
+                        System.out.println("Something weird with the next game date. Continuing.");
+                        continue;
+                    } else {
+                        String spread = currentPrediction.select("td").get(5).childNode(0).toString();
+                        if (!homeTeamFailure) {
+                            spread = "-" + spread;
+                        }
+                        predictions[i][6] = spread;
+                        homeTeamFailure = false;
+                        break;
+                    }
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace(System.out);
+            }
         }
     }
 
