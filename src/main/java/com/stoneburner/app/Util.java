@@ -19,10 +19,7 @@ import org.jsoup.select.Elements;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -791,8 +788,13 @@ public class Util {
                 if (teams.size() != 2) {
                     continue;
                 }
-                String away = cleanNCAATeamName(teams.get(0).childNodes().get(0).toString().trim());
-                String home = cleanNCAATeamName(teams.get(1).childNodes().get(0).toString().trim());
+                if (game.toString().contains("Results")) {
+                    break;
+                }
+                String away = teams.get(0).text().trim();
+                away = isNFL ? cleanNFLTeamName(away) : cleanNCAATeamName(away);
+                String home = teams.get(1).text().trim();
+                home = isNFL ? cleanNFLTeamName(home) : cleanNCAATeamName(home);
                 String prediction = game.select("td").get(1).childNode(0).toString();
 
                 ScriptEngineManager mgr = new ScriptEngineManager();
@@ -912,5 +914,47 @@ public class Util {
         return (longerLength - getLevenshteinDistance(longer, shorter)) /
                 (double) longerLength;
 
+    }
+
+    public static void printResults(boolean isNFL, String[][] predictions) {
+        BufferedWriter bw = null;
+
+        try {
+            File file = new File(format("/Users/patrick.stoneburner/Desktop/%s_picks.csv", isNFL ? "nfl" : "ncaa"));
+            if (!file.exists()) {
+                file.createNewFile();
+            }
+
+            FileWriter fw1 = new FileWriter(file);
+            bw = new BufferedWriter(fw1);
+            if (isNFL) {
+                bw.write("Home Team, Away Team, PR, Dratings, Fox, OS, 538, Massey, Sagarin, Spread");
+            } else {
+                bw.write("Home Team, Away Team, PR, Dratings, Fox, OS, S&P+, Massey, Sagarin, 538, Atomic, Spread");
+            }
+            bw.newLine();
+
+            for (int i = 0; i < predictions.length; i++) {
+                if (isNFL) {
+                    bw.write(format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", predictions[i][0], predictions[i][1],
+                            predictions[i][2] != null ? predictions[i][2] : "",
+                            predictions[i][3] != null ? predictions[i][3] : "",
+                            predictions[i][4] != null ? predictions[i][4] : "",
+                            predictions[i][5] != null ? predictions[i][5] : "",
+                            predictions[i][6] != null ? predictions[i][6] : "",
+                            predictions[i][7] != null ? predictions[i][7] : "",
+                            predictions[i][8] != null ? predictions[i][8] : "",
+                            predictions[i][9] != null ? predictions[i][9] : ""));
+                } else {
+                    bw.write(format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", predictions[i][0], predictions[i][1], predictions[i][2] != null ? predictions[i][2] : "", predictions[i][3] != null ? predictions[i][3] : "", predictions[i][4] != null ? predictions[i][4] : "", predictions[i][5] != null ? predictions[i][5] : "", predictions[i][6] != null ? predictions[i][6] : "", predictions[i][7] != null ? predictions[i][7] : "", predictions[i][8] != null ? predictions[i][8] : "", predictions[i][9] != null ? predictions[i][9] : "", predictions[i][10] != null ? predictions[i][10] : "", predictions[i][11] != null ? predictions[i][11] : ""));
+                }
+                bw.newLine();
+            }
+
+            bw.close();
+
+        } catch (IOException e) {
+            System.exit(0);
+        }
     }
 }
