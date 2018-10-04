@@ -5,9 +5,9 @@ import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 /**
- * Unit test for simple NCAAMain.
+ * Unit test for simple Main.
  */
-public class NCAAMainTest
+public class MainTest
     extends TestCase
 {
     /**
@@ -15,7 +15,7 @@ public class NCAAMainTest
      *
      * @param testName name of the test case
      */
-    public NCAAMainTest(String testName )
+    public MainTest(String testName )
     {
         super( testName );
     }
@@ -25,7 +25,7 @@ public class NCAAMainTest
      */
     public static Test suite()
     {
-        return new TestSuite( test.java.com.stoneburner.app.NCAAMainTest.class );
+        return new TestSuite( test.java.com.stoneburner.app.MainTest.class );
     }
 
     /**

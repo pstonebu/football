@@ -34,9 +34,7 @@ import static java.util.Arrays.copyOfRange;
 import static java.util.Locale.ENGLISH;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringEscapeUtils.unescapeHtml4;
-import static org.apache.commons.lang3.StringUtils.getLevenshteinDistance;
-import static org.apache.commons.lang3.StringUtils.isBlank;
-import static org.apache.commons.lang3.StringUtils.isNotEmpty;
+import static org.apache.commons.lang3.StringUtils.*;
 import static org.apache.commons.lang3.text.WordUtils.capitalizeFully;
 import static org.joda.time.Weeks.weeksBetween;
 import static org.jsoup.Jsoup.connect;
@@ -364,6 +362,45 @@ public class Util {
         }
     }
 
+    public static void grab538NFL(String[][] predictions) {
+        System.out.println( "Fetching '" + input538NFL + "'");
+
+        //Execute client with our method
+        try
+        {
+            Document page = connect(input538NFL).get();
+
+            Element week = page.select("section[class=week]").get(0);
+            Elements rows = week.select("tr[class=tr]");
+
+            for (int i = 0; i < rows.size(); i=i+3) {
+                String awayTeam = rows.get(i+1).select("td[class=td text team]").get(0).childNodes().get(0).toString().trim();
+                String homeTeam = rows.get(i+2).select("td[class=td text team]").get(0).childNodes().get(0).toString().trim();
+
+                String awaySpread = rows.get(i+1).select("td[class=td number spread]").get(0).childNodes().get(0).toString().trim();
+                String homeSpread = rows.get(i+2).select("td[class=td number spread]").get(0).childNodes().get(0).toString().trim();
+                if (homeSpread != null && homeSpread.equals("PK")) {
+                    homeSpread = "0.0";
+                } else if (awaySpread != null && awaySpread.equals("PK")) {
+                    awaySpread = "+0.0";
+                }
+
+                for (int j = 0; j < predictions.length; j++) {
+                    double homeResult =  similarity(predictions[j][0], homeTeam);
+                    double awayResult =  similarity(predictions[j][1], awayTeam);
+                    if (homeResult == 1 || awayResult == 1) {
+                        predictions[j][6] = !isEmpty(awaySpread) ? awaySpread.substring(1) : homeSpread;
+                    }
+                }
+            }
+        }
+
+        catch (Exception e) {
+            e.printStackTrace(System.out);
+            System.exit(0);
+        }
+    }
+
     public static void grabSpread(boolean isNFL, String[][] predictions) {
         String url = isNFL ? inputSpreadNFL : inputSpreadNCAA;
         System.out.println( "Fetching '" + url + "'");
@@ -447,7 +484,7 @@ public class Util {
         }
     }
 
-    public static void grabSagarin(boolean isNFL, String[][] predictions, int column) {
+    public static void grabSagarin(boolean isNFL, String[][] predictions) {
         String url = isNFL ? inputSagarinNFL : inputSagarinNCAA;
         System.out.println( "Fetching '" + url + "'");
 
@@ -464,7 +501,7 @@ public class Util {
 
                 //iterate through list of games to find a match
                 for (int j = 0; j < rows.length; j++) {
-                    String currentRow = rows[j];
+                    String currentRow = unescapeHtml4(rows[j]);
                     if (currentRow.startsWith("=====") || isBlank(currentRow) || currentRow.contains("eigen")) {
                         break;
                     } else if (!currentRow.toLowerCase().contains(home.toLowerCase()) && !currentRow.toLowerCase().contains(away.toLowerCase())) {
@@ -503,7 +540,7 @@ public class Util {
                             }
                         }
                     }
-                    predictions[i][column] = String.valueOf(averageSpread);
+                    predictions[i][8] = String.valueOf(averageSpread);
                     break;
                 }
             }
@@ -515,7 +552,7 @@ public class Util {
         }
     }
 
-    public static void grabMassey(boolean isNFL, String[][] predictions, int column) {
+    public static void grabMassey(boolean isNFL, String[][] predictions) {
         String url = isNFL ? inputMasseyNFL : inputMasseyNCAA;
         System.out.println( "Fetching '" + url + "'");
 
@@ -563,7 +600,7 @@ public class Util {
                     double awayResult =  similarity(predictions[j][1], away);
                     if (homeResult == 1 || awayResult == 1) {
                         actualRow = j;
-                        predictions[actualRow][column] = String.valueOf(spread);
+                        predictions[actualRow][7] = String.valueOf(spread);
                         //maybe the two are reversed?
                     } else {
                         homeResult =  similarity(predictions[j][0], away);
@@ -575,14 +612,14 @@ public class Util {
                             away = third;
                             spread = spread * -1.0;
                             actualRow = j;
-                            predictions[actualRow][column] = String.valueOf(spread);
+                            predictions[actualRow][7] = String.valueOf(spread);
                         }
                     }
                 }
                 if (actualRow < 0) {
-                    actualRow = askForRow(column, predictions, home, away);
+                    actualRow = askForRow(7, predictions, home, away);
                     if (actualRow >= 0) {
-                        predictions[actualRow][column] = String.valueOf(spread);
+                        predictions[actualRow][7] = String.valueOf(spread);
                     }
                 }
             }
@@ -669,7 +706,7 @@ public class Util {
         try
         {
             Document page = connect(url).get();
-            Elements rows = page.select("table[class=small-text]").get(isNFL ? 1 : 0).select("tr");
+            Elements rows = page.select("table[class=small-text]").get(1).select("tr");
 
             for (int i = 2; i < rows.size(); i = i + 2) {
                 Element rowOne = rows.get(i);
@@ -725,7 +762,9 @@ public class Util {
                 }
 
                 String away = teams.get(0).childNode(0).toString();
+                away = isNFL ? cleanNFLTeamName(away) : cleanNCAATeamName(away);
                 String home = teams.get(1).childNode(0).toString();
+                home = isNFL ? cleanNFLTeamName(home) : cleanNFLTeamName(home);
 
                 if (isNFL) {
                     away = teamMascotToCity.get(away);
@@ -868,7 +907,8 @@ public class Util {
                 .replace("Miami OH", "Miami (OH)").replace("Int'l", "International").replace("UCF", "Central Florida")
                 .replace("SMU", "Southern Methodist").replace("Middle Tennessee", "Middle Tennessee State").replace("Texas El Paso", "UTEP")
                 .replace("Texas-San Antonio", "UTSA").replace("Alabama-Birmingham", "UAB").replace("Southern California", "USC")
-                .replace("Nevada-Las Vegas", "UNLV").replace("Louisiana State", "LSU").replace("Miami-FL", "Miami (FL)").trim();
+                .replace("Nevada-Las Vegas", "UNLV").replace("Louisiana State", "LSU").replace("Miami-FL", "Miami (FL)")
+                .replace("Texas St-San Marcos", "Texas State").trim();
     }
 
     private static String cleanNFLTeamName(String teamName) {
