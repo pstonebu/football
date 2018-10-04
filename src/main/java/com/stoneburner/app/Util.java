@@ -10,6 +10,7 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.jsoup.nodes.Node;
 import org.jsoup.nodes.TextNode;
 import org.jsoup.select.Elements;
 
@@ -23,12 +24,15 @@ import java.util.List;
 import static java.lang.Double.valueOf;
 import static java.lang.Math.abs;
 import static java.lang.String.format;
+import static java.util.Arrays.asList;
 import static java.util.Arrays.copyOfRange;
 import static java.util.Locale.ENGLISH;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringEscapeUtils.unescapeHtml4;
 import static org.apache.commons.lang3.StringUtils.getLevenshteinDistance;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
+import static org.apache.commons.lang3.text.WordUtils.capitalizeFully;
 import static org.joda.time.Weeks.weeksBetween;
 import static org.jsoup.Jsoup.connect;
 
@@ -372,8 +376,10 @@ public class Util {
                     continue;
                 }
 
-                String teamOne = cleanNCAATeamName(current.select("a[class=tabletext]").get(0).childNode(0).toString());
-                String teamTwo = cleanNCAATeamName(current.select("a[class=tabletext]").get(1).childNode(0).toString());
+                String teamOne = current.select("a[class=tabletext]").get(0).childNode(0).toString();
+                teamOne = isNFL ? cleanNFLTeamName(teamOne) : cleanNCAATeamName(teamOne);
+                String teamTwo = current.select("a[class=tabletext]").get(1).childNode(0).toString();
+                teamTwo = isNFL ? cleanNFLTeamName(teamTwo) : cleanNCAATeamName(teamTwo);
 
                 List<String> spreadParts = current.select("a[href$=#BU]").get(0).childNodes().stream()
                         .filter(n -> (n instanceof TextNode))
@@ -432,6 +438,69 @@ public class Util {
 
         catch (Exception e) {
             e.printStackTrace(System.out);
+            System.exit(0);
+        }
+    }
+
+    public static void grabSagarin(boolean isNFL, String[][] predictions, int column) {
+        String url = isNFL ? inputSagarinNFL : inputSagarinNCAA;
+        System.out.println( "Fetching '" + url + "'");
+
+        try
+        {
+            Document page = connect(url).get();
+            Node predictionSection = page.select("a[name=Predictions]").get(0).parent().parent().parent().childNode(2);
+            String[] rows = copyOfRange(predictionSection.toString().split("\r\n"), 8,
+                    predictionSection.toString().split("\r\n").length);
+
+            for (int i = 0; i < predictions.length; i++) {
+                String home = predictions[i][0];
+                String away = predictions[i][1];
+
+                //iterate through list of games to find a match
+                for (int j = 0; j < rows.length; j++) {
+                    String currentRow = rows[j];
+                    if (currentRow.startsWith("=====") || isBlank(currentRow) || currentRow.contains("eigen")) {
+                        break;
+                    } else if (!currentRow.toLowerCase().contains(home.toLowerCase()) && !currentRow.toLowerCase().contains(away.toLowerCase())) {
+                        continue;
+                    }
+
+                    String favorite = currentRow.substring(4, 27).trim();
+                    String underdog = currentRow.substring(59).trim();
+
+                    String[] spreads = currentRow.substring(27, 59).trim().split("\\s+");
+                    double averageSpread = asList(spreads).stream().mapToDouble(Double::valueOf).average().getAsDouble();
+
+                    //neutral site game
+                    if (currentRow.substring(0,3).contains("n")) {
+                        favorite = capitalizeFully(favorite);
+                        underdog = capitalizeFully(underdog);
+
+                        if (favorite.equals(home) || underdog.equals(away)) {
+                            averageSpread = averageSpread * -1.0;
+                        }
+                    } else {
+                        if (favorite.equals(favorite.toUpperCase())) {
+                            if (!favorite.toUpperCase().equals(home.toUpperCase()) && !underdog.toUpperCase().equals(away.toUpperCase())) {
+                                continue;
+                            }
+                            averageSpread = averageSpread * -1.0;
+                        } else {
+                            if (!favorite.toUpperCase().equals(away.toUpperCase()) && !underdog.toUpperCase().equals
+                                    (home.toUpperCase())) {
+                                continue;
+                            }
+                        }
+                    }
+                    predictions[i][column] = String.valueOf(averageSpread);
+                    break;
+                }
+            }
+        }
+
+        catch (Exception e) {
+            System.out.println("Exception occurred: " + e);
             System.exit(0);
         }
     }
