@@ -1,10 +1,6 @@
 package com.stoneburner.app;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.util.EntityUtils;
+import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
@@ -33,9 +29,11 @@ import static java.util.Arrays.asList;
 import static java.util.Arrays.copyOfRange;
 import static java.util.Locale.ENGLISH;
 import static java.util.stream.Collectors.toList;
-import static org.apache.commons.lang3.StringEscapeUtils.unescapeHtml4;
-import static org.apache.commons.lang3.StringUtils.*;
-import static org.apache.commons.lang3.text.WordUtils.capitalizeFully;
+import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.isEmpty;
+import static org.apache.commons.lang3.StringUtils.isNotEmpty;
+import static org.apache.commons.text.StringEscapeUtils.unescapeHtml4;
+import static org.apache.commons.text.WordUtils.capitalizeFully;
 import static org.joda.time.Weeks.weeksBetween;
 import static org.jsoup.Jsoup.connect;
 
@@ -212,8 +210,8 @@ public class Util {
                 home = isNFL ? cleanNFLTeamName(home) : cleanNCAATeamName(home);
 
                 String summary = unescapeHtml4(current.childNodes().get(2).toString());
-                boolean negative = summary.toString().startsWith(home);
-                String[] spreadParts = summary.toString().split("\\.");
+                boolean negative = summary.startsWith(home);
+                String[] spreadParts = summary.split("\\.");
                 String spreadTail = spreadParts[1].split(" ")[0];
                 String spreadHead = spreadParts[0].split(" ")[spreadParts[0].split(" ").length - 1];
 
@@ -301,20 +299,14 @@ public class Util {
     public static void grab538NCAA(String[][] predictions) {
         System.out.println("Fetching '" + input538NCAA + "'");
 
-        //Instantiate client and method
-        HttpClient client = HttpClientBuilder.create().build();
-        HttpGet method = new HttpGet(input538NCAA);
-
         //Execute client with our method
         try {
             HashMap<String,Integer> teams = new HashMap<String,Integer>();
-            HttpResponse response = client.execute(method);
 
-            String source = EntityUtils.toString(response.getEntity());
-            String[] rows = source.split("\n");
+            String[] rows = connect(input538NCAA).maxBodySize(0).get().body().html().split("(?<=(\\d|winout)[ ])");
 
             for (int i = 1; i < rows.length; i++) {
-                String[] rowParts = rows[i].split(",");
+                String[] rowParts = rows[i].trim().split(",");
                 String teamName = cleanNCAATeamName(rowParts[0]);
                 int won = Integer.valueOf(rowParts[6]);
 
@@ -556,16 +548,10 @@ public class Util {
         String url = isNFL ? inputMasseyNFL : inputMasseyNCAA;
         System.out.println( "Fetching '" + url + "'");
 
-        //Instantiate client and method
-        HttpClient client = HttpClientBuilder.create().build();
-        HttpGet method = new HttpGet(url);
-
         //Execute client with our method
         try
         {
-            HttpResponse response = client.execute(method);
-
-            String source = EntityUtils.toString(response.getEntity());
+            String source = connect(url).ignoreContentType(true).get().body().text();
 
             JSONObject json = new JSONObject(source);
             JSONArray gamesArray = json.getJSONArray("DI");
@@ -706,7 +692,7 @@ public class Util {
         try
         {
             Document page = connect(url).get();
-            Elements rows = page.select("table[class=small-text]").get(1).select("tr");
+            Elements rows = page.select("table[class=small-text]").get(isNFL ? 0 : 1).select("tr");
 
             for (int i = 2; i < rows.size(); i = i + 2) {
                 Element rowOne = rows.get(i);
@@ -951,7 +937,7 @@ public class Util {
         int longerLength = longer.length();
         if (longerLength == 0) { return 1.0; } // both strings are zero length
 
-        return (longerLength - getLevenshteinDistance(longer, shorter)) /
+        return (longerLength - new LevenshteinDistance().apply(longer, shorter)) /
                 (double) longerLength;
 
     }
