@@ -20,6 +20,7 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static java.lang.Double.valueOf;
 import static java.lang.Math.abs;
@@ -442,7 +443,7 @@ public class Util {
         }
     }
 
-    public static void grabSagarin(boolean isNFL, String[][] predictions, int column) {
+    private static void grabSagarin(boolean isNFL, String[][] predictions, int column) {
         String url = isNFL ? inputSagarinNFL : inputSagarinNCAA;
         System.out.println( "Fetching '" + url + "'");
 
@@ -471,6 +472,11 @@ public class Util {
 
                     String[] spreads = currentRow.substring(27, 59).trim().split("\\s+");
                     double averageSpread = asList(spreads).stream().mapToDouble(Double::valueOf).average().getAsDouble();
+
+                    if (isNFL) {
+                        home = addMascot(home);
+                        away = addMascot(away);
+                    }
 
                     //neutral site game
                     if (currentRow.substring(0,3).contains("n")) {
@@ -505,7 +511,19 @@ public class Util {
         }
     }
 
-    public static String cleanNCAATeamName(String teamName) {
+    private static String addMascot(String city) {
+        if (city.contains("Los Angeles")) {
+            return city;
+        }
+        for (Map.Entry<String,String> mascotAndCity : teamMascotToCity.entrySet()) {
+            if (mascotAndCity.getValue().equals(city)) {
+                return city + " " + mascotAndCity.getKey();
+            }
+        }
+        return city;
+    }
+
+    private static String cleanNCAATeamName(String teamName) {
         return teamName.replaceAll(" St$"," State").replaceFirst("E ", "Eastern ").replaceFirst("^C ", "Central ").replaceAll("&amp;","&")
                 .replace("FL ", "Florida ").replaceAll("Intl$", "International").replace("FIU","Florida International").replace("AM","A&M").replace("NC ", "North Carolina ")
                 .replaceAll(" St.$"," State").replace("<b>","").replace("</b>","").replaceFirst("^W ", "Western ").replaceFirst("^Ga ", "Georgia ")
