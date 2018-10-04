@@ -8,6 +8,8 @@ import org.apache.http.util.EntityUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.nodes.Node;
@@ -443,7 +445,7 @@ public class Util {
         }
     }
 
-    private static void grabSagarin(boolean isNFL, String[][] predictions, int column) {
+    public static void grabSagarin(boolean isNFL, String[][] predictions, int column) {
         String url = isNFL ? inputSagarinNFL : inputSagarinNCAA;
         System.out.println( "Fetching '" + url + "'");
 
@@ -507,6 +509,80 @@ public class Util {
 
         catch (Exception e) {
             System.out.println("Exception occurred: " + e);
+            System.exit(0);
+        }
+    }
+
+    public static void grabMassey(boolean isNFL, String[][] predictions, int column) {
+        String url = isNFL ? inputMasseyNFL : inputMasseyNCAA;
+        System.out.println( "Fetching '" + url + "'");
+
+        //Instantiate client and method
+        HttpClient client = HttpClientBuilder.create().build();
+        HttpGet method = new HttpGet(url);
+
+        //Execute client with our method
+        try
+        {
+            HttpResponse response = client.execute(method);
+
+            String source = EntityUtils.toString(response.getEntity());
+
+            JSONObject json = new JSONObject(source);
+            JSONArray gamesArray = json.getJSONArray("DI");
+
+            for (Object currentGame : gamesArray) {
+                JSONArray current = (JSONArray)currentGame;
+                String away = (String)((JSONArray)current.get(2)).get(0);
+                away = isNFL ? cleanNFLTeamName(away) : cleanNCAATeamName(away);
+                String home = ((String)((JSONArray)current.get(3)).get(0)).replace("@ ", "");
+                home = isNFL ? cleanNFLTeamName(home) : cleanNCAATeamName(home);
+                double spread;
+                Object prediction = ((JSONArray)current.get(12)).get(0);
+                if (prediction instanceof Integer) {
+                    spread = (double)((Integer)prediction) * -1.0;
+                } else if (prediction instanceof Double) {
+                    spread = (Double)prediction * -1.0;
+                } else {
+                    continue;
+                }
+
+                //Find a spot in our array for these values
+                int actualRow = -1;
+                for (int j = 0; j < predictions.length; j++) {
+                    double homeResult =  similarity(predictions[j][0], home);
+                    double awayResult =  similarity(predictions[j][1], away);
+                    if (homeResult == 1 || awayResult == 1) {
+                        actualRow = j;
+                        predictions[actualRow][column] = String.valueOf(spread);
+                        //maybe the two are reversed?
+                    } else {
+                        homeResult =  similarity(predictions[j][0], away);
+                        awayResult =  similarity(predictions[j][1], home);
+
+                        if (homeResult == 1 || awayResult == 1) {
+                            String third = home;
+                            home = away;
+                            away = third;
+                            spread = spread * -1.0;
+                            actualRow = j;
+                            predictions[actualRow][column] = String.valueOf(spread);
+                        }
+                    }
+                }
+                if (actualRow < 0) {
+                    actualRow = askForRow(column, predictions, home, away);
+                    if (actualRow >= 0) {
+                        predictions[actualRow][column] = String.valueOf(spread);
+                    }
+                }
+            }
+
+
+        }
+
+        catch (Exception e) {
+            e.printStackTrace(System.out);
             System.exit(0);
         }
     }
