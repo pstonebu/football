@@ -776,6 +776,75 @@ public class Util {
         }
     }
 
+    public static void grabOddsShark(boolean isNFL, String[][] predictions) {
+        String url = isNFL ? inputURIOSNFL : inputURIOSNCAA;
+        System.out.println( "Fetching '" + url + "'");
+
+        try
+        {
+            Document page = connect(url).get();
+            Elements games = page.select("table");
+
+            for (int i = 0; i < games.size(); i++) {
+                Element game = games.get(i);
+                Elements teams = game.getElementsByClass("name-long");
+                if (teams.size() != 2) {
+                    continue;
+                }
+                String away = cleanNCAATeamName(teams.get(0).childNodes().get(0).toString().trim());
+                String home = cleanNCAATeamName(teams.get(1).childNodes().get(0).toString().trim());
+                String prediction = game.select("td").get(1).childNode(0).toString();
+
+                ScriptEngineManager mgr = new ScriptEngineManager();
+                ScriptEngine engine = mgr.getEngineByName("JavaScript");
+                Object result = engine.eval(prediction);
+                double margin;
+                if (result instanceof Integer) {
+                    margin = (double)((Integer)result);
+                } else {
+                    margin = (Double)result;
+                }
+
+                //Find a spot in our array for these values
+                int actualRow = -1;
+                for (int j = 0; j < predictions.length; j++) {
+                    double homeResult =  similarity(predictions[j][0], home);
+                    double awayResult =  similarity(predictions[j][1], away);
+                    if (homeResult == 1 || awayResult == 1) {
+                        actualRow = j;
+                        predictions[actualRow][5] = String.valueOf(margin);
+                        break;
+                        //maybe the two are reversed?
+                    } else {
+                        homeResult =  similarity(predictions[j][0], away);
+                        awayResult =  similarity(predictions[j][1], home);
+
+                        if (homeResult == 1 || awayResult == 1) {
+                            String third = home;
+                            home = away;
+                            away = third;
+                            margin = margin * -1.0;
+                            actualRow = j;
+                            predictions[actualRow][5] = String.valueOf(margin);
+                            break;
+                        }
+                    }
+                }
+                if (actualRow < 0) {
+                    actualRow = askForRow(5, predictions, home, away);
+                    if (actualRow >= 0) {
+                        predictions[actualRow][5] = String.valueOf(margin);
+                    }
+                }
+            }
+        }
+
+        catch (Exception e) {
+            e.printStackTrace(System.out);
+            System.exit(0);
+        }
+    }
+
     private static String addMascot(String city) {
         if (city.contains("Los Angeles")) {
             return city;
