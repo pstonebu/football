@@ -1,25 +1,27 @@
 package com.stoneburner.app;
 
+import java.util.List;
+
+import static com.google.common.collect.Lists.newArrayList;
 import static com.stoneburner.app.Util.*;
 
 public class NCAAMain {
 
     public static void main( String[] args ) {
-        //Home  Away    PR  DR  Fox  OS S&P+    Massey  Sagarin 538 Atomic  Spread
-        String[][] predictions = new String[100][12];
+        List<NCAAGame> games = newArrayList();
 
-        predictions = grabPowerRank(false, predictions);
-        grabAtomic(predictions);
-        grab538NCAA(predictions);
-        grabSpread(false, predictions);
-        grabSagarin(false, predictions);
-        grabMassey(false, predictions);
-        //grabSandP(predictions);
-        grabDRatings(false, predictions);
+        grabPowerRank(games);
+        grabAtomic(games);
+        grab538(games);
+        grabSpread(games);
+        grabSagarin(games);
+        grabMassey(games);
+        grabSandP(games);
+        grabDRatings(games);
         //disabling fox until they prove they don't suck
-        //grabFox(false, predictions);
-        grabOddsShark(false, predictions);
-        printResults(false, predictions);
+        //grabFox(games);
+        grabOddsShark(games);
+        printResults(games);
 
         System.out.println("Done!");
     }

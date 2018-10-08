@@ -1,22 +1,25 @@
 package com.stoneburner.app;
 
+import java.util.List;
+
+import static com.google.common.collect.Lists.newArrayList;
 import static com.stoneburner.app.Util.*;
 
 public class NFLMain
 {
     public static void main( String[] args ) {
-        String[][] predictions = new String[16][10];
+        List<Game> games = newArrayList();
 
-        predictions = grabPowerRank(true, predictions);
-        grabSpread(true, predictions);
-        grabSagarin(true, predictions);
-        grabMassey(true, predictions);
-        grab538NFL(predictions);
-        grabDRatings(true, predictions);
-        grabFox(true, predictions);
-        grabOddsShark(true, predictions);
+        grabPowerRank(games);
+        grabSpread(games);
+        grabSagarin(games);
+        grabMassey(games);
+        grab538(games);
+        grabDRatings(games);
+        grabFox(games);
+        grabOddsShark(games);
 
-        printResults(true, predictions);
+        printResults(games);
 
         System.out.println("Done!");
     }

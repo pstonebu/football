@@ -1,5 +1,6 @@
 package com.stoneburner.app;
 
+import com.google.common.util.concurrent.AtomicDouble;
 import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
@@ -20,6 +21,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 import static java.lang.Double.valueOf;
 import static java.lang.Math.abs;
@@ -29,9 +34,7 @@ import static java.util.Arrays.asList;
 import static java.util.Arrays.copyOfRange;
 import static java.util.Locale.ENGLISH;
 import static java.util.stream.Collectors.toList;
-import static org.apache.commons.lang3.StringUtils.isBlank;
-import static org.apache.commons.lang3.StringUtils.isEmpty;
-import static org.apache.commons.lang3.StringUtils.isNotEmpty;
+import static org.apache.commons.lang3.StringUtils.*;
 import static org.apache.commons.text.StringEscapeUtils.unescapeHtml4;
 import static org.apache.commons.text.WordUtils.capitalizeFully;
 import static org.joda.time.Weeks.weeksBetween;
@@ -46,6 +49,7 @@ public class Util {
     private static String inputURIFoxNCAA = "https://www.foxsports.com/college-football/predictions?season=2018&seasonType=1&week=%d&group=-3";
     private static String inputURIFoxNFL = "http://www.foxsports.com/nfl/predictions";
     private static String inputSP = "https://www.footballstudyhall.com/pages/2018-%team%-advanced-statistical-profile";
+    private static String inputSPSheet = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTNXgxlcihtmzIbzHDsQH5CXI6aSXfsZzWB7E8IC0sf4CaMsgP_p4DRSwx6TtoektFRCL3wO5m64JLB/pubhtml";
     private static String inputSagarinNCAA = "http://sagarin.com/sports/cfsend.htm";
     private static String inputSagarinNFL = "http://sagarin.com/sports/nflsend.htm";
     private static String inputMasseyNCAA = "http://www.masseyratings.com/predjson.php?s=cf&sub=11604&dt=$dt$";
@@ -180,7 +184,8 @@ public class Util {
     }
 
 
-    public static String[][] grabPowerRank(boolean isNFL, String[][] predictions) {
+    public static <T extends Game> void grabPowerRank(List<T> games) {
+        boolean isNFL = Thread.currentThread().getStackTrace()[2].getFileName().contains("NFL");
         System.out.println( "Fetching '" + inputURIPR + "'");
         int numGames = 0;
 
@@ -217,9 +222,11 @@ public class Util {
 
                 String spread = (negative ? "-" : "") + spreadHead + "." + spreadTail;
 
-                predictions[numGames][0] = home;
-                predictions[numGames][1] = away;
-                predictions[numGames++][2] = spread;
+                Game game = isNFL ? new Game() : new NCAAGame();
+                game.setHome(home);
+                game.setAway(away);
+                game.setPowerRank(spread);
+                games.add((T) game);
             }
         }
 
@@ -227,11 +234,9 @@ public class Util {
             e.printStackTrace(System.out);
             System.exit(0);
         }
-
-        return copyOfRange(predictions, 0, numGames);
     }
 
-    public static void grabAtomic(String[][] predictions) {
+    public static void grabAtomic(List<NCAAGame> games) {
         System.out.println("Fetching '" + inputAtomic + "'");
 
         try {
@@ -260,35 +265,32 @@ public class Util {
                 }
 
                 //Find a spot in our array for these values
-                int actualRow = -1;
-                for (int j = 0; j < predictions.length; j++) {
-                    double homeResult =  similarity(predictions[j][0], home);
-                    double awayResult =  similarity(predictions[j][1], away);
+                for (int j = 0; j < games.size(); j++) {
+                    NCAAGame game = games.get(j);
+                    double homeResult =  similarity(game.getHome(), home);
+                    double awayResult =  similarity(game.getAway(), away);
                     if (homeResult == 1 || awayResult == 1) {
-                        actualRow = j;
-                        predictions[actualRow][10] = margin;
-                        //maybe the two are reversed?
+                        game.setAtomic(margin);
+                        return;
+                    //maybe the two are reversed?
                     } else {
-                        homeResult =  similarity(predictions[j][0], away);
-                        awayResult =  similarity(predictions[j][1], home);
+                        homeResult =  similarity(game.getHome(), away);
+                        awayResult =  similarity(game.getAway(), home);
 
                         if (homeResult == 1 || awayResult == 1) {
-                            String third = home;
-                            home = away;
-                            away = third;
                             margin = String.valueOf(Integer.valueOf(margin) * -1);
-                            actualRow = j;
-                            predictions[actualRow][10] = String.valueOf(margin);
+                            game.setAtomic(margin);
+                            return;
                         }
                     }
                 }
-                if (actualRow < 0) {
-                    //TODO, put this back?
-                    //actualRow = askForRow(10, home, away);
-                    if (actualRow >= 0) {
-                        predictions[actualRow][10] = margin;
-                    }
+
+                int actualRow = -1;
+                //actualRow = askForRow(10, home, away);
+                if (actualRow >= 0) {
+                    games.get(actualRow).setAtomic(margin);
                 }
+
             }
         } catch (Exception e) {
             e.printStackTrace(System.out);
@@ -296,7 +298,7 @@ public class Util {
         }
     }
 
-    public static void grab538NCAA(String[][] predictions) {
+    private static <T extends Game> void grab538NCAA(List<T> games) {
         System.out.println("Fetching '" + input538NCAA + "'");
 
         //Execute client with our method
@@ -322,29 +324,29 @@ public class Util {
                     continue;
                 }
                 Double winPct = teams.get(teamName) * 100.0 / ((rows.length-1 * 1.0) / teams.size());
-                Double spread = null;
+                final AtomicDouble spread = new AtomicDouble();
                 if (winPct < 50.0) {
                     winPct = 100.0 - winPct;
-                    spread = Math.pow((winPct / 49.25), (1.0/.194)) * -1.0;
+                    spread.set(Math.pow((winPct / 49.25), (1.0/.194)) * -1.0);
                 } else {
-                    spread = Math.pow((winPct / 49.25), (1.0/.194));
+                    spread.set(Math.pow((winPct / 49.25), (1.0/.194)));
                 }
 
-                boolean found = false;
-                for (int i = 0; i < predictions.length; i++) {
-                    String home = predictions[i][0];
-                    String away = predictions[i][1];
+                final AtomicBoolean found = new AtomicBoolean(false);
+                games.stream().forEach(g -> {
+                    String home = g.getHome();
+                    String away = g.getAway();
 
                     if (similarity(home, teamName) == 1.0) {
-                        found = true;
-                        predictions[i][9] = String.valueOf(spread * -1.0);
+                        found.set(true);
+                        g.setFiveThirtyEight(String.valueOf(spread.get() * -1.0));
                     } else if (similarity(away, teamName) == 1.0) {
-                        found = true;
-                        predictions[i][9] = String.valueOf(spread);
+                        found.set(true);
+                        g.setFiveThirtyEight(String.valueOf(spread));
                     }
-                }
+                });
 
-                if (!found) {
+                if (!found.get()) {
                     System.out.println("Did not find a spot for " + teamName + " with a spread of " + spread);
                 }
             }
@@ -354,7 +356,11 @@ public class Util {
         }
     }
 
-    public static void grab538NFL(String[][] predictions) {
+    public static <T extends Game> void grab538(List<T> games) {
+        if (games.get(0) instanceof NCAAGame) {
+            grab538NCAA(games);
+            return;
+        }
         System.out.println( "Fetching '" + input538NFL + "'");
 
         //Execute client with our method
@@ -377,13 +383,16 @@ public class Util {
                     awaySpread = "+0.0";
                 }
 
-                for (int j = 0; j < predictions.length; j++) {
-                    double homeResult =  similarity(predictions[j][0], homeTeam);
-                    double awayResult =  similarity(predictions[j][1], awayTeam);
+                AtomicBoolean shouldIterate = new AtomicBoolean(false);
+                String finalAwaySpread = awaySpread;
+                String finalHomeSpread = homeSpread;
+                games.stream().filter(g -> shouldIterate.get()).forEach(g -> {
+                    double homeResult =  similarity(g.getHome(), homeTeam);
+                    double awayResult =  similarity(g.getAway(), awayTeam);
                     if (homeResult == 1 || awayResult == 1) {
-                        predictions[j][6] = !isEmpty(awaySpread) ? awaySpread.substring(1) : homeSpread;
+                        g.setFiveThirtyEight(!isEmpty(finalAwaySpread) ? finalAwaySpread.substring(1) : finalHomeSpread);
                     }
-                }
+                });
             }
         }
 
@@ -393,7 +402,8 @@ public class Util {
         }
     }
 
-    public static void grabSpread(boolean isNFL, String[][] predictions) {
+    public static <T extends Game> void grabSpread(List<T> games) {
+        boolean isNFL = !(games.get(0) instanceof NCAAGame);
         String url = isNFL ? inputSpreadNFL : inputSpreadNCAA;
         System.out.println( "Fetching '" + url + "'");
 
@@ -410,10 +420,10 @@ public class Util {
                     continue;
                 }
 
-                String teamOne = current.select("a[class=tabletext]").get(0).childNode(0).toString();
-                teamOne = isNFL ? cleanNFLTeamName(teamOne) : cleanNCAATeamName(teamOne);
-                String teamTwo = current.select("a[class=tabletext]").get(1).childNode(0).toString();
-                teamTwo = isNFL ? cleanNFLTeamName(teamTwo) : cleanNCAATeamName(teamTwo);
+                final AtomicReference<String> teamOne = new AtomicReference(current.select("a[class=tabletext]").get(0).childNode(0).toString());
+                teamOne.set(isNFL ? cleanNFLTeamName(teamOne.get()) : cleanNCAATeamName(teamOne.get()));
+                final AtomicReference<String> teamTwo = new AtomicReference(current.select("a[class=tabletext]").get(1).childNode(0).toString());
+                teamTwo.set(isNFL ? cleanNFLTeamName(teamTwo.get()) : cleanNCAATeamName(teamTwo.get()));
 
                 List<String> spreadParts = current.select("a[href$=#BU]").get(0).childNodes().stream()
                         .filter(n -> (n instanceof TextNode))
@@ -422,49 +432,46 @@ public class Util {
                         .subList(1,3);
 
                 boolean teamOneIsFavorite;
-                Double spread = null;
+                AtomicDouble spread = new AtomicDouble();
                 if (spreadParts.get(0).startsWith("-")) {
                     teamOneIsFavorite = true;
                     if (isNotEmpty(spreadParts.get(0)) && !spreadParts.get(0).equals(" ")) {
                         String spreadString = spreadParts.get(0).split("-|\\+|EV")[1].replace("½", ".5").replace(" EV", "");
-                        spread = abs(valueOf(spreadString.substring(0, spreadString.length() - 1)));
+                        spread.set(abs(valueOf(spreadString.substring(0, spreadString.length() - 1))));
                     }
                 } else {
                     teamOneIsFavorite = false;
                     if (isNotEmpty(spreadParts.get(1)) && !spreadParts.get(1).equals(" ")) {
                         String spreadString = spreadParts.get(1).split("-|\\+|EV")[1].replace("½", ".5").replace(" EV", "");
-                        spread = abs(valueOf(spreadString.substring(0, spreadString.length() - 1)));
+                        spread.set(abs(valueOf(spreadString.substring(0, spreadString.length() - 1))));
                     }
                 }
 
                 if (spread != null) {
                     //Find a spot in our array for these values
-                    int actualRow = -1;
-                    int column = predictions[0].length - 1;
-                    for (int j = 0; j < predictions.length; j++) {
-                        double homeResult = similarity(predictions[j][0], teamTwo);
-                        double awayResult = similarity(predictions[j][1], teamOne);
+                    AtomicBoolean shouldIterate = new AtomicBoolean(true);
+                    games.stream().filter(g -> shouldIterate.get()).forEach(g -> {
+                        double homeResult = similarity(g.getHome(), teamTwo.get());
+                        double awayResult = similarity(g.getAway(), teamOne.get());
                         if (homeResult == 1 || awayResult == 1) {
-                            actualRow = j;
-                            predictions[actualRow][column] = String.valueOf(spread * (teamOneIsFavorite ? 1.0 : -1.0));
-                            break;
+                            g.setSpread(String.valueOf(spread.get() * (teamOneIsFavorite ? 1.0 : -1.0)));
+                            shouldIterate.set(false);
                             //maybe the two are reversed?
                         } else {
-                            homeResult = similarity(predictions[j][0], teamOne);
-                            awayResult = similarity(predictions[j][1], teamTwo);
+                            homeResult = similarity(g.getHome(), teamOne.get());
+                            awayResult = similarity(g.getAway(), teamTwo.get());
 
                             if (homeResult == 1 || awayResult == 1) {
-                                actualRow = j;
-                                predictions[actualRow][column] = String.valueOf(spread * (teamOneIsFavorite ? -1.0 : 1.0));
-                                break;
+                                g.setSpread(String.valueOf(spread.get() * (teamOneIsFavorite ? -1.0 : 1.0)));
+                                shouldIterate.set(false);
                             }
                         }
-                    }
-                    if (actualRow < 0) {
-                        actualRow = askForRow(column, predictions, teamOne, teamTwo);
-                        if (actualRow >= 0) {
-                            predictions[actualRow][column] = String.valueOf(spread);
-                        }
+                    });
+
+                    Function<T,String> getter = g -> g.getSpread();
+                    int actualGame = askForRow(getter, games, teamOne.get(), teamTwo.get());
+                    if (actualGame >= 0) {
+                        games.get(actualGame).setSpread(String.valueOf(spread.get() * (teamOneIsFavorite ? 1.0 : -1.0)));
                     }
                 }
             }
@@ -476,7 +483,8 @@ public class Util {
         }
     }
 
-    public static void grabSagarin(boolean isNFL, String[][] predictions) {
+    public static <T extends Game> void grabSagarin(List<T> games) {
+        boolean isNFL = !(games.get(0) instanceof NCAAGame);
         String url = isNFL ? inputSagarinNFL : inputSagarinNCAA;
         System.out.println( "Fetching '" + url + "'");
 
@@ -487,9 +495,10 @@ public class Util {
             String[] rows = copyOfRange(predictionSection.toString().split("\r\n"), 8,
                     predictionSection.toString().split("\r\n").length);
 
-            for (int i = 0; i < predictions.length; i++) {
-                String home = predictions[i][0];
-                String away = predictions[i][1];
+            for (int i = 0; i < games.size(); i++) {
+                Game game = games.get(i);
+                String home = game.getHome();
+                String away = game.getAway();
 
                 //iterate through list of games to find a match
                 for (int j = 0; j < rows.length; j++) {
@@ -532,7 +541,7 @@ public class Util {
                             }
                         }
                     }
-                    predictions[i][8] = String.valueOf(averageSpread);
+                    game.setSagarin(String.valueOf(averageSpread));
                     break;
                 }
             }
@@ -544,7 +553,8 @@ public class Util {
         }
     }
 
-    public static void grabMassey(boolean isNFL, String[][] predictions) {
+    public static <T extends Game> void grabMassey(List<T> games) {
+        boolean isNFL = !(games.get(0) instanceof NCAAGame);
         String url = isNFL ? inputMasseyNFL : inputMasseyNCAA;
         System.out.println( "Fetching '" + url + "'");
 
@@ -558,54 +568,53 @@ public class Util {
 
             for (Object currentGame : gamesArray) {
                 JSONArray current = (JSONArray)currentGame;
-                String away = current.getJSONArray(2).getString(0);
-                away = isNFL ? cleanNFLTeamName(away) : cleanNCAATeamName(away);
-                String home = current.getJSONArray(3).getString(0).replace("@ ", "");
-                home = isNFL ? cleanNFLTeamName(home) : cleanNCAATeamName(home);
-                Double spread = null;
+                AtomicReference<String> away = new AtomicReference(current.getJSONArray(2).getString(0));
+                away.set(isNFL ? cleanNFLTeamName(away.get()) : cleanNCAATeamName(away.get()));
+                AtomicReference<String> home = new AtomicReference(current.getJSONArray(3).getString(0).replace("@ ", ""));
+                home.set(isNFL ? cleanNFLTeamName(home.get()) : cleanNCAATeamName(home.get()));
+                final AtomicDouble spread = new AtomicDouble();
                 Object prediction = ((JSONArray)current.get(12)).get(0);
                 if (prediction instanceof Integer) {
-                    spread = (double)((Integer)prediction) * -1.0;
+                    spread.set((double)((Integer)prediction) * -1.0);
                 } else if (prediction instanceof Double) {
-                    spread = (Double)prediction * -1.0;
+                    spread.set((Double)prediction * -1.0);
                 } else if (prediction instanceof String && prediction.equals("---")) {
                     Object innerprediction = ((JSONArray)current.get(13)).get(0);
                     if (innerprediction instanceof Integer) {
-                        spread = (double)((Integer)innerprediction);
+                        spread.set((double)((Integer)innerprediction));
                     } else if (innerprediction instanceof Double) {
-                        spread = (Double)innerprediction;
+                        spread.set((Double)innerprediction);
                     } else {
                         continue;
                     }
                 }
 
                 //Find a spot in our array for these values
-                int actualRow = -1;
-                for (int j = 0; j < predictions.length; j++) {
-                    double homeResult =  similarity(predictions[j][0], home);
-                    double awayResult =  similarity(predictions[j][1], away);
+                AtomicBoolean shouldIterate = new AtomicBoolean(true);
+                games.stream().filter(g -> shouldIterate.get()).forEach(g -> {
+                    double homeResult =  similarity(g.getHome(), home.get());
+                    double awayResult =  similarity(g.getAway(), away.get());
                     if (homeResult == 1 || awayResult == 1) {
-                        actualRow = j;
-                        predictions[actualRow][7] = String.valueOf(spread);
+                        g.setMassey(String.valueOf(spread.get()));
+                        shouldIterate.set(false);
                         //maybe the two are reversed?
                     } else {
-                        homeResult =  similarity(predictions[j][0], away);
-                        awayResult =  similarity(predictions[j][1], home);
+                        homeResult =  similarity(g.getHome(), away.get());
+                        awayResult =  similarity(g.getAway(), home.get());
 
                         if (homeResult == 1 || awayResult == 1) {
-                            String third = home;
-                            home = away;
-                            away = third;
-                            spread = spread * -1.0;
-                            actualRow = j;
-                            predictions[actualRow][7] = String.valueOf(spread);
+                            spread.set(spread.get() * -1.0);
+                            g.setMassey(String.valueOf(spread));
+                            shouldIterate.set(false);
                         }
                     }
-                }
-                if (actualRow < 0) {
-                    actualRow = askForRow(7, predictions, home, away);
-                    if (actualRow >= 0) {
-                        predictions[actualRow][7] = String.valueOf(spread);
+                });
+
+                if (shouldIterate.get()) {
+                    Function<T,String> getter = g -> g.getMassey();
+                    int actualGame = askForRow(getter, games, home.get(), away.get());
+                    if (actualGame >= 0) {
+                        games.get(actualGame).setMassey(String.valueOf(spread));
                     }
                 }
             }
@@ -617,12 +626,13 @@ public class Util {
         }
     }
 
-    public static void grabSandP(String[][] predictions) {
+    public static void grabSandPScrape(List<NCAAGame> games) {
         boolean homeTeamFailure = false;
         boolean awayTeamFailure = false;
-        for (int i = 0; i < predictions.length; i++) {
-            String homeTeam = predictions[i][0];
-            String awayTeam = predictions[i][1];
+        for (int i = 0; i < games.size(); i++) {
+            NCAAGame game = games.get(i);
+            String homeTeam = game.getHome();
+            String awayTeam = game.getAway();
             String homeUrl;
             String awayUrl;
             try {
@@ -673,7 +683,7 @@ public class Util {
                         if (!homeTeamFailure) {
                             spread = "-" + spread;
                         }
-                        predictions[i][6] = spread;
+                        game.setSAndP(spread);
                         homeTeamFailure = false;
                         break;
                     }
@@ -685,7 +695,47 @@ public class Util {
         }
     }
 
-    public static void grabDRatings(boolean isNFL, String[][] predictions) {
+    public static void grabSandP(List<NCAAGame> games) {
+        System.out.println("Fetching sAndP predictions");
+
+        try {
+            Elements rows = connect(inputSPSheet).maxBodySize(0).get().select("table").get(1).select("tr");
+
+            for (int i = 2; i < rows.size(); i++) {
+                Elements tds = rows.get(i).select("td");
+                String teams = tds.get(2).text().replaceAll("No. \\d{1,2} ", "");
+                String away = teams.split("(\\bat\\b|vs\\.)")[0].trim();
+                String home = teams.split("(\\bat\\b|vs\\.)")[1].trim();
+                String spPrediction = tds.get(6).text();
+                boolean homeIsSPFavorite = spPrediction.startsWith(home);
+                String spMargin = spPrediction.substring(spPrediction.indexOf(" by ") + 4, spPrediction.indexOf("(")).trim();
+                String fPlusPrediction = tds.get(10).text();
+                boolean homeIsFPFavorite = fPlusPrediction.startsWith(home);
+                String fpMargin = fPlusPrediction.substring(fPlusPrediction.indexOf(" by ") + 4).trim();
+
+                String cleanedHome = cleanNCAATeamName(home);
+                String cleanedAway = cleanNCAATeamName(away);
+
+                AtomicBoolean shouldIterate = new AtomicBoolean(true);
+                games.stream().filter(g -> shouldIterate.get()).filter(g -> g.getSAndP() == null).forEach(g -> {
+                    if (similarity(g.getHome(), cleanedHome) == 1.0 || similarity(g.getAway(), cleanedAway) == 1.0) {
+                        g.setSAndP((homeIsSPFavorite ? "-" : "") + spMargin);
+                        g.setFPlus((homeIsFPFavorite ? "-" : "") + fpMargin);
+                        shouldIterate.set(false);
+                    } else if (teams.contains(" vs. ") && (similarity(g.getHome(), cleanedAway) == 1.0 || similarity(g.getAway(), cleanedHome) == 1.0)) {
+                        g.setSAndP((homeIsSPFavorite ? "" : "-") + spMargin);
+                        g.setFPlus((homeIsFPFavorite ? "" : "-") + fpMargin);
+                        shouldIterate.set(false);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+    }
+
+    public static <T extends Game> void grabDRatings(List<T> games) {
+        boolean isNFL = !(games.get(0) instanceof NCAAGame);
         String url = isNFL ? inputURIDRNFL : inputURIDRNCAA;
         System.out.println( "Fetching '" + url + "'");
 
@@ -710,16 +760,17 @@ public class Util {
                 double margin = valueOf(awayPoints) - valueOf(homePoints);
 
                 //Find a spot in our array for these values
-                for (int j = 0; j < predictions.length; j++) {
-                    double homeResult =  similarity(predictions[j][0], home);
-                    double awayResult =  similarity(predictions[j][1], away);
+                for (int j = 0; j < games.size(); j++) {
+                    Game game = games.get(j);
+                    double homeResult =  similarity(game.getHome(), home);
+                    double awayResult =  similarity(game.getAway(), away);
                     if (homeResult == 1 || awayResult == 1) {
-                        predictions[j][3] = String.valueOf(margin);
+                        game.setDRatings(String.valueOf(margin));
                     } else {
-                        homeResult = similarity(predictions[j][0], away);
-                        awayResult = similarity(predictions[j][1], home);
+                        homeResult = similarity(game.getHome(), away);
+                        awayResult = similarity(game.getAway(), home);
                         if (homeResult == 1 || awayResult == 1) {
-                            predictions[j][3] = String.valueOf(margin * -1.0);
+                            game.setDRatings(String.valueOf(margin * -1.0));
                         }
                     }
                 }
@@ -732,7 +783,8 @@ public class Util {
         }
     }
 
-    public static void grabFox(boolean isNFL, String[][] predictions) {
+    public static <T extends Game> void grabFox(List<T> gameList) {
+        boolean isNFL = !(gameList.get(0) instanceof NCAAGame);
         String url = isNFL ? inputURIFoxNFL : inputURIFoxNCAA;
         System.out.println( "Fetching '" + url + "'");
 
@@ -769,22 +821,20 @@ public class Util {
                     prediction = (Double)result;
                 }
 
-                for (int j = 0; j < predictions.length; j++) {
-                    double homeResult =  similarity(predictions[j][0], home);
-                    double awayResult =  similarity(predictions[j][1], away);
+                for (int j = 0; j < gameList.size(); j++) {
+                    Game current = gameList.get(j);
+                    double homeResult =  similarity(current.getHome(), home);
+                    double awayResult =  similarity(current.getAway(), away);
                     if (homeResult == 1 || awayResult == 1) {
-                        predictions[j][4] = String.valueOf(prediction);
+                        current.setFox(String.valueOf(prediction));
                         break;
                     } else {
-                        homeResult =  similarity(predictions[j][0], away);
-                        awayResult =  similarity(predictions[j][1], home);
+                        homeResult =  similarity(current.getHome(), away);
+                        awayResult =  similarity(current.getAway(), home);
 
                         if (homeResult == 1 || awayResult == 1) {
-                            String third = home;
-                            home = away;
-                            away = third;
                             prediction = prediction * -1.0;
-                            predictions[j][4] = String.valueOf(prediction);
+                            current.setFox(String.valueOf(prediction));
                             break;
                         }
                     }
@@ -798,7 +848,8 @@ public class Util {
         }
     }
 
-    public static void grabOddsShark(boolean isNFL, String[][] predictions) {
+    public static <T extends Game> void grabOddsShark(List<T> gameList) {
+        boolean isNFL = !(gameList.get(0) instanceof NCAAGame);
         String url = isNFL ? inputURIOSNFL : inputURIOSNCAA;
         System.out.println( "Fetching '" + url + "'");
 
@@ -825,42 +876,40 @@ public class Util {
                 ScriptEngineManager mgr = new ScriptEngineManager();
                 ScriptEngine engine = mgr.getEngineByName("JavaScript");
                 Object result = engine.eval(prediction);
-                double margin;
+                final AtomicDouble margin = new AtomicDouble();
                 if (result instanceof Integer) {
-                    margin = (double)((Integer)result);
+                    margin.set((double)((Integer)result));
                 } else {
-                    margin = (Double)result;
+                    margin.set((Double)result);
                 }
 
                 //Find a spot in our array for these values
-                int actualRow = -1;
-                for (int j = 0; j < predictions.length; j++) {
-                    double homeResult =  similarity(predictions[j][0], home);
-                    double awayResult =  similarity(predictions[j][1], away);
+                AtomicBoolean shouldIterate = new AtomicBoolean(true);
+                String finalHome = home;
+                String finalAway = away;
+                gameList.stream().filter(g -> shouldIterate.get()).forEach(g -> {
+                    double homeResult =  similarity(g.getHome(), finalHome);
+                    double awayResult =  similarity(g.getAway(), finalAway);
                     if (homeResult == 1 || awayResult == 1) {
-                        actualRow = j;
-                        predictions[actualRow][5] = String.valueOf(margin);
-                        break;
+                        g.setOddsShark(String.valueOf(margin.get()));
+                        shouldIterate.set(false);
                         //maybe the two are reversed?
                     } else {
-                        homeResult =  similarity(predictions[j][0], away);
-                        awayResult =  similarity(predictions[j][1], home);
+                        homeResult =  similarity(g.getHome(), finalAway);
+                        awayResult =  similarity(g.getAway(), finalHome);
 
                         if (homeResult == 1 || awayResult == 1) {
-                            String third = home;
-                            home = away;
-                            away = third;
-                            margin = margin * -1.0;
-                            actualRow = j;
-                            predictions[actualRow][5] = String.valueOf(margin);
-                            break;
+                            g.setOddsShark(String.valueOf(margin.get() * -1.0));
+                            shouldIterate.set(false);
                         }
                     }
-                }
-                if (actualRow < 0) {
-                    actualRow = askForRow(5, predictions, home, away);
-                    if (actualRow >= 0) {
-                        predictions[actualRow][5] = String.valueOf(margin);
+                });
+
+                if (shouldIterate.get()) {
+                    Function<T,String> getter = g -> g.getOddsShark();
+                    int actualGame = askForRow(getter, gameList, home, away);
+                    if (actualGame >= 0) {
+                        gameList.get(actualGame).setOddsShark(String.valueOf(margin));
                     }
                 }
             }
@@ -894,7 +943,7 @@ public class Util {
                 .replace("SMU", "Southern Methodist").replace("Middle Tennessee", "Middle Tennessee State").replace("Texas El Paso", "UTEP")
                 .replace("Texas-San Antonio", "UTSA").replace("Alabama-Birmingham", "UAB").replace("Southern California", "USC")
                 .replace("Nevada-Las Vegas", "UNLV").replace("Louisiana State", "LSU").replace("Miami-FL", "Miami (FL)")
-                .replace("Texas St-San Marcos", "Texas State").trim();
+                .replace("Texas St-San Marcos", "Texas State").replace("UL-Monroe", "Louisiana Monroe").replace("Ole Miss", "Mississippi").trim();
     }
 
     private static String cleanNFLTeamName(String teamName) {
@@ -904,18 +953,20 @@ public class Util {
                 .replaceFirst("L.A.", "Los Angeles");
     }
 
-    private static int askForRow(int column, String[][] predictions, String...args) {
+    private static <T extends Game> int askForRow(Function<T, String> getter, List<T> games, String home, String away) {
         BufferedReader br = null;
 
         try {
             br = new BufferedReader(new InputStreamReader(System.in));
 
-            System.out.println(format("Which game is %s vs. %s? ", args[0], args[1]));
-            for (int i = 0; i < predictions.length; i++) {
-                if (predictions[i][column] == null) {
-                    System.out.println(format("%d) %s vs. %s", i, predictions[i][0], predictions[i][1]));
+            System.out.println(format("Which game is %s vs. %s? ", home, away));
+            AtomicInteger count = new AtomicInteger(0);
+            games.stream().forEach(g -> {
+                if (getter.apply(g) == null) {
+                    System.out.println(format("%d) %s vs. %s", count.get(), g.getHome(), g.getAway()));
                 }
-            }
+                count.incrementAndGet();
+            });
             String input = br.readLine();
 
             return Integer.valueOf(input);
@@ -942,7 +993,8 @@ public class Util {
 
     }
 
-    public static void printResults(boolean isNFL, String[][] predictions) {
+    public static <T extends Game> void printResults(List<T> games) {
+        boolean isNFL = !(games.get(0) instanceof NCAAGame);
         BufferedWriter bw = null;
 
         try {
@@ -956,23 +1008,36 @@ public class Util {
             if (isNFL) {
                 bw.write("Home Team, Away Team, PR, Dratings, Fox, OS, 538, Massey, Sagarin, Spread");
             } else {
-                bw.write("Home Team, Away Team, PR, Dratings, Fox, OS, S&P+, Massey, Sagarin, 538, Atomic, Spread");
+                bw.write("Home Team, Away Team, PR, Dratings, Fox, OS, 538, Massey, Sagarin, S&P+, F/+, Atomic, Spread");
             }
             bw.newLine();
 
-            for (int i = 0; i < predictions.length; i++) {
+            for (int i = 0; i < games.size(); i++) {
                 if (isNFL) {
-                    bw.write(format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", predictions[i][0], predictions[i][1],
-                            predictions[i][2] != null ? predictions[i][2] : "",
-                            predictions[i][3] != null ? predictions[i][3] : "",
-                            predictions[i][4] != null ? predictions[i][4] : "",
-                            predictions[i][5] != null ? predictions[i][5] : "",
-                            predictions[i][6] != null ? predictions[i][6] : "",
-                            predictions[i][7] != null ? predictions[i][7] : "",
-                            predictions[i][8] != null ? predictions[i][8] : "",
-                            predictions[i][9] != null ? predictions[i][9] : ""));
+                    Game game = games.get(i);
+                    bw.write(format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", game.getHome(), game.getAway(),
+                            game.getPowerRank(),
+                            game.getDRatings(),
+                            game.getFox(),
+                            game.getOddsShark(),
+                            game.getFiveThirtyEight(),
+                            game.getMassey(),
+                            game.getSagarin(),
+                            game.getSpread()));
                 } else {
-                    bw.write(format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", predictions[i][0], predictions[i][1], predictions[i][2] != null ? predictions[i][2] : "", predictions[i][3] != null ? predictions[i][3] : "", predictions[i][4] != null ? predictions[i][4] : "", predictions[i][5] != null ? predictions[i][5] : "", predictions[i][6] != null ? predictions[i][6] : "", predictions[i][7] != null ? predictions[i][7] : "", predictions[i][8] != null ? predictions[i][8] : "", predictions[i][9] != null ? predictions[i][9] : "", predictions[i][10] != null ? predictions[i][10] : "", predictions[i][11] != null ? predictions[i][11] : ""));
+                    NCAAGame game = (NCAAGame) games.get(i);
+                    bw.write(format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", game.getHome(), game.getAway(),
+                            game.getPowerRank(),
+                            game.getDRatings(),
+                            game.getFox(),
+                            game.getOddsShark(),
+                            game.getFiveThirtyEight(),
+                            game.getMassey(),
+                            game.getSagarin(),
+                            game.getSAndP(),
+                            game.getFPlus(),
+                            game.getAtomic(),
+                            game.getSpread()));
                 }
                 bw.newLine();
             }
