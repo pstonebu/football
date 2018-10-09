@@ -27,6 +27,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static com.google.common.base.Strings.isNullOrEmpty;
+import static com.google.common.collect.Lists.newArrayList;
+import static com.google.common.collect.Maps.newHashMap;
 import static java.lang.Double.valueOf;
 import static java.lang.Math.abs;
 import static java.lang.String.format;
@@ -42,31 +44,35 @@ import static org.joda.time.Weeks.weeksBetween;
 import static org.jsoup.Jsoup.connect;
 
 public class Util {
-    private static String inputURIPR = "https://thepowerrank.com/predictions/";
-    private static String inputURIDRNCAA = "http://www.dratings.com/predictor/ncaa-football-predictions/";
-    private static String inputURIDRNFL = "http://www.dratings.com/predictor/nfl-football-predictions/";
-    private static String inputURIOSNCAA = "https://www.oddsshark.com/ncaaf/computer-picks";
-    private static String inputURIOSNFL = "http://www.oddsshark.com/nfl/computer-picks";
-    private static String inputURIFoxNCAA = "https://www.foxsports.com/college-football/predictions?season=2018&seasonType=1&week=%d&group=-3";
-    private static String inputURIFoxNFL = "http://www.foxsports.com/nfl/predictions";
-    private static String inputSP = "https://www.footballstudyhall.com/pages/2018-%team%-advanced-statistical-profile";
-    private static String inputSPSheet = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTNXgxlcihtmzIbzHDsQH5CXI6aSXfsZzWB7E8IC0sf4CaMsgP_p4DRSwx6TtoektFRCL3wO5m64JLB/pubhtml";
-    private static String inputSagarinNCAA = "http://sagarin.com/sports/cfsend.htm";
-    private static String inputSagarinNFL = "http://sagarin.com/sports/nflsend.htm";
-    private static String inputMasseyNCAA = "http://www.masseyratings.com/predjson.php?s=cf&sub=11604&dt=$dt$";
-    private static String inputMasseyNFL = "http://www.masseyratings.com/predjson.php?s=nfl&dt=$dt$";
-    private static String inputSpreadNCAA = "http://www.vegasinsider.com/college-football/odds/offshore/2/";
-    private static String inputSpreadNFL = "http://www.vegasinsider.com/nfl/odds/offshore/2/";
-    private static String input538NCAA = "https://projects.fivethirtyeight.com/2018-college-football-predictions/sims.csv";
-    private static String input538NFL = "https://projects.fivethirtyeight.com/2018-nfl-predictions/games/";
-    private static String inputAtomic = "http://www.atomicfootball.com/archive/af_predictions_All.html";
+    private String inputURIPR = "https://thepowerrank.com/predictions/";
+    private String inputURIDRNCAA = "http://www.dratings.com/predictor/ncaa-football-predictions/";
+    private String inputURIDRNFL = "http://www.dratings.com/predictor/nfl-football-predictions/";
+    private String inputURIOSNCAA = "https://www.oddsshark.com/ncaaf/computer-picks";
+    private String inputURIOSNFL = "http://www.oddsshark.com/nfl/computer-picks";
+    private String inputURIFoxNCAA = "https://www.foxsports.com/college-football/predictions?season=2018&seasonType=1&week=%d&group=-3";
+    private String inputURIFoxNFL = "http://www.foxsports.com/nfl/predictions";
+    private String inputSP = "https://www.footballstudyhall.com/pages/2018-%team%-advanced-statistical-profile";
+    private String inputSPSheet = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTNXgxlcihtmzIbzHDsQH5CXI6aSXfsZzWB7E8IC0sf4CaMsgP_p4DRSwx6TtoektFRCL3wO5m64JLB/pubhtml";
+    private String inputSagarinNCAA = "http://sagarin.com/sports/cfsend.htm";
+    private String inputSagarinNFL = "http://sagarin.com/sports/nflsend.htm";
+    private String inputMasseyNCAA = "http://www.masseyratings.com/predjson.php?s=cf&sub=11604&dt=$dt$";
+    private String inputMasseyNFL = "http://www.masseyratings.com/predjson.php?s=nfl&dt=$dt$";
+    private String inputSpreadNCAA = "http://www.vegasinsider.com/college-football/odds/offshore/2/";
+    private String inputSpreadNFL = "http://www.vegasinsider.com/nfl/odds/offshore/2/";
+    private String input538NCAA = "https://projects.fivethirtyeight.com/2018-college-football-predictions/sims.csv";
+    private String input538NFL = "https://projects.fivethirtyeight.com/2018-nfl-predictions/games/";
+    private String inputAtomic = "http://www.atomicfootball.com/archive/af_predictions_All.html";
 
-    public static List<String> teamwords = new ArrayList<String>();
-    public static HashMap<String,String> teamShortToLong = new HashMap<String,String>();
-    public static HashMap<String,String> teamMascotToCity = new HashMap<String,String>();
+    private List<String> teamwords = newArrayList();
+    private HashMap<String,String> teamShortToLong = newHashMap();
+    private HashMap<String,String> teamMascotToCity = newHashMap();
+    private HashMap<String,Integer> teamToId = newHashMap();
+    private List<Game> games = newArrayList();
+    private HashMap<Integer,Game> idToGame = newHashMap();
 
-    //static initializer
-    static {
+    private boolean isNFL;
+    
+    public Util(boolean isNFL) {
         //What week of the season is it?
         DateTime game1 = new DateTime(1535760000000l);
         DateTime today = new DateTime();
@@ -76,6 +82,8 @@ public class Util {
         DateTimeFormatter dtfOut = DateTimeFormat.forPattern("yyyyMMdd");
         inputMasseyNCAA = inputMasseyNCAA.replace("$dt$", dtfOut.print(today));
         inputMasseyNFL = inputMasseyNFL.replace("$dt$", dtfOut.print(today));
+
+        this.isNFL = isNFL;
 
         teamwords.add("new");
         teamwords.add("england");
@@ -182,11 +190,140 @@ public class Util {
         teamMascotToCity.put("Ravens","Baltimore");
         teamMascotToCity.put("Giants","New York Giants");
         teamMascotToCity.put("Rams","Los Angeles Rams");
+
+        teamToId.put("Alabama", 333);
+        teamToId.put("Ohio State", 194);
+        teamToId.put("Georgia", 61);
+        teamToId.put("Clemson", 228);
+        teamToId.put("Penn State", 213);
+        teamToId.put("Michigan", 130);
+        teamToId.put("Oklahoma", 201);
+        teamToId.put("Notre Dame", 87);
+        teamToId.put("Washington", 264);
+        teamToId.put("Florida", 57);
+        teamToId.put("Wisconsin", 275);
+        teamToId.put("Miami (FL)", 2390);
+        teamToId.put("Mississippi State", 344);
+        teamToId.put("West Virginia", 277);
+        teamToId.put("Auburn", 2);
+        teamToId.put("LSU", 99);
+        teamToId.put("Texas", 251);
+        teamToId.put("Texas A&M", 245);
+        teamToId.put("Iowa", 2294);
+        teamToId.put("Stanford", 24);
+        teamToId.put("Oklahoma State", 197);
+        teamToId.put("Texas Tech", 2641);
+        teamToId.put("Utah", 254);
+        teamToId.put("Michigan State", 127);
+        teamToId.put("Missouri", 142);
+        teamToId.put("Kentucky", 96);
+        teamToId.put("Boise State", 68);
+        teamToId.put("Washington State", 265);
+        teamToId.put("North Carolina State", 152);
+        teamToId.put("South Carolina", 2579);
+        teamToId.put("Oregon", 2483);
+        teamToId.put("Fresno State", 278);
+        teamToId.put("Duke", 150);
+        teamToId.put("Virginia Tech", 259);
+        teamToId.put("Central Florida", 2116);
+        teamToId.put("TCU", 2628);
+        teamToId.put("USC", 30);
+        teamToId.put("Georgia Tech", 59);
+        teamToId.put("Boston College", 103);
+        teamToId.put("Utah State", 328);
+        teamToId.put("Arizona State", 9);
+        teamToId.put("Northwestern", 77);
+        teamToId.put("Appalachian State", 2026);
+        teamToId.put("Iowa State", 66);
+        teamToId.put("Syracuse", 183);
+        teamToId.put("Purdue", 2509);
+        teamToId.put("Mississippi", 145);
+        teamToId.put("Maryland", 120);
+        teamToId.put("Memphis", 235);
+        teamToId.put("Colorado", 38);
+        teamToId.put("Houston", 248);
+        teamToId.put("Florida State", 52);
+        teamToId.put("Cincinnati", 2132);
+        teamToId.put("California", 25);
+        teamToId.put("Arizona", 12);
+        teamToId.put("Baylor", 239);
+        teamToId.put("Indiana", 84);
+        teamToId.put("Virginia", 258);
+        teamToId.put("Minnesota", 135);
+        teamToId.put("North Texas", 249);
+        teamToId.put("South Florida", 58);
+        teamToId.put("Vanderbilt", 238);
+        teamToId.put("Tennessee", 2633);
+        teamToId.put("San Diego State", 21);
+        teamToId.put("Army", 349);
+        teamToId.put("Kansas State", 2306);
+        teamToId.put("Temple", 218);
+        teamToId.put("Wake Forest", 154);
+        teamToId.put("UCLA", 26);
+        teamToId.put("Brigham Young", 252);
+        teamToId.put("Toledo", 2649);
+        teamToId.put("Pittsburgh", 221);
+        teamToId.put("Nebraska", 158);
+        teamToId.put("Western Michigan", 2711);
+        teamToId.put("Kansas", 2305);
+        teamToId.put("Georgia Southern", 290);
+        teamToId.put("Troy", 2653);
+        teamToId.put("Air Force", 2005);
+        teamToId.put("Tulane", 2655);
+        teamToId.put("Illinois", 356);
+        teamToId.put("North Carolina", 153);
+        teamToId.put("Arkansas", 8);
+        teamToId.put("Northern Illinois", 2459);
+        teamToId.put("Buffalo", 2084);
+        teamToId.put("Eastern Michigan", 2199);
+        teamToId.put("Marshall", 276);
+        teamToId.put("UAB", 5);
+        teamToId.put("Arkansas State", 2032);
+        teamToId.put("Louisiana Tech", 2348);
+        teamToId.put("Florida Atlantic", 2226);
+        teamToId.put("Florida International", 2229);
+        teamToId.put("Louisville", 97);
+        teamToId.put("Middle Tennessee State", 2393);
+        teamToId.put("Ohio", 195);
+        teamToId.put("Tulsa", 202);
+        teamToId.put("Miami (OH)", 193);
+        teamToId.put("New Mexico", 167);
+        teamToId.put("Nevada", 2440);
+        teamToId.put("Wyoming", 2751);
+        teamToId.put("Southern Miss", 2572);
+        teamToId.put("Navy", 2426);
+        teamToId.put("Southern Methodist", 2567);
+        teamToId.put("Akron", 2006);
+        teamToId.put("Oregon State", 204);
+        teamToId.put("Ball State", 2050);
+        teamToId.put("Coastal Carolina", 324);
+        teamToId.put("Hawaii", 62);
+        teamToId.put("Central Michigan", 2117);
+        teamToId.put("UNLV", 2439);
+        teamToId.put("Massachusetts", 113);
+        teamToId.put("Western Kentucky", 98);
+        teamToId.put("Colorado State", 36);
+        teamToId.put("Rutgers", 164);
+        teamToId.put("Liberty", 2335);
+        teamToId.put("Louisiana", 309);
+        teamToId.put("East Carolina", 151);
+        teamToId.put("Old Dominion", 295);
+        teamToId.put("Georgia State", 2247);
+        teamToId.put("UTSA", 2636);
+        teamToId.put("Louisiana Monroe", 2433);
+        teamToId.put("San Jose State", 23);
+        teamToId.put("Kent State", 2309);
+        teamToId.put("Bowling Green", 189);
+        teamToId.put("Charlotte", 2429);
+        teamToId.put("New Mexico State", 166);
+        teamToId.put("South Alabama", 6);
+        teamToId.put("Connecticut", 41);
+        teamToId.put("Rice", 242);
+        teamToId.put("UTEP", 2638);
+        teamToId.put("Texas State", 326);
     }
 
-
-    public static <T extends Game> void grabPowerRank(List<T> games) {
-        boolean isNFL = Thread.currentThread().getStackTrace()[2].getFileName().contains("NFL");
+    public void grabPowerRank() {
         System.out.println( "Fetching '" + inputURIPR + "'");
         int numGames = 0;
 
@@ -224,20 +361,29 @@ public class Util {
                 String spread = (negative ? "-" : "") + spreadHead + "." + spreadTail;
 
                 Game game = isNFL ? new Game() : new NCAAGame();
+                Integer homeId = teamToId.get(home);
+                if (homeId == null) {
+                    System.out.println("Could not find " + home + " in our map!");
+                }
+                Integer awayId = teamToId.get(away);
+                if (awayId == null) {
+                    System.out.println("Could not find " + away + " in our map!");
+                }
                 game.setHome(home);
                 game.setAway(away);
                 game.setPowerRank(spread);
-                games.add((T) game);
+                games.add(game);
+                idToGame.put(homeId, game);
+                idToGame.put(awayId, game);
             }
         }
 
         catch (Exception e) {
-            e.printStackTrace(System.out);
-            System.exit(0);
+            logAndExit(e);
         }
     }
 
-    public static void grabAtomic(List<NCAAGame> games) {
+    public void grabAtomic() {
         System.out.println("Fetching '" + inputAtomic + "'");
 
         try {
@@ -267,40 +413,43 @@ public class Util {
 
                 //Find a spot in our array for these values
                 AtomicBoolean shouldIterate = new AtomicBoolean(true);
-                games.stream().filter(g -> shouldIterate.get()).filter(g -> !isNullOrEmpty(g.getAtomic())).forEach(g -> {
-                    double homeResult =  similarity(g.getHome(), home);
-                    double awayResult =  similarity(g.getAway(), away);
-                    if (homeResult == 1 || awayResult == 1) {
-                        g.setAtomic(margin.get());
-                        shouldIterate.set(false);
-                    //maybe the two are reversed?
-                    } else {
-                        homeResult =  similarity(g.getHome(), away);
-                        awayResult =  similarity(g.getAway(), home);
+                games.stream()
+                        .filter(g -> shouldIterate.get())
+                        .map(g -> {return (NCAAGame)g;})
+                        .filter(g -> !isNullOrEmpty(g.getAtomic()))
+                        .forEach(g -> {
+                            double homeResult =  similarity(g.getHome(), home);
+                            double awayResult =  similarity(g.getAway(), away);
+                            if (homeResult == 1 || awayResult == 1) {
+                                g.setAtomic(margin.get());
+                                shouldIterate.set(false);
+                            //maybe the two are reversed?
+                            } else {
+                                homeResult =  similarity(g.getHome(), away);
+                                awayResult =  similarity(g.getAway(), home);
 
-                        if (homeResult == 1 || awayResult == 1) {
-                            g.setAtomic("-" + margin.get());
-                            shouldIterate.set(false);
-                        }
-                    }
-                });
+                                if (homeResult == 1 || awayResult == 1) {
+                                    g.setAtomic("-" + margin.get());
+                                    shouldIterate.set(false);
+                                }
+                            }
+                        });
 
                 if (shouldIterate.get()) {
-                    Function<NCAAGame, String> getter = g -> g.getAtomic();
+                    Function<Game, String> getter = g -> ((NCAAGame)g).getAtomic();
                     int actualRow = askForRow(getter, games, home, away);
                     if (actualRow >= 0) {
-                        games.get(actualRow).setAtomic(margin.get());
+                        ((NCAAGame)games.get(actualRow)).setAtomic(margin.get());
                     }
                 }
 
             }
         } catch (Exception e) {
-            e.printStackTrace(System.out);
-            System.exit(0);
+            logAndExit(e);
         }
     }
 
-    private static <T extends Game> void grab538NCAA(List<T> games) {
+    private void grab538NCAA() {
         System.out.println("Fetching '" + input538NCAA + "'");
 
         //Execute client with our method
@@ -358,9 +507,9 @@ public class Util {
         }
     }
 
-    public static <T extends Game> void grab538(List<T> games) {
-        if (games.get(0) instanceof NCAAGame) {
-            grab538NCAA(games);
+    public void grab538() {
+        if (!isNFL) {
+            grab538NCAA();
             return;
         }
         System.out.println( "Fetching '" + input538NFL + "'");
@@ -399,13 +548,11 @@ public class Util {
         }
 
         catch (Exception e) {
-            e.printStackTrace(System.out);
-            System.exit(0);
+            logAndExit(e);
         }
     }
 
-    public static <T extends Game> void grabSpread(List<T> games) {
-        boolean isNFL = !(games.get(0) instanceof NCAAGame);
+    public void grabSpread() {
         String url = isNFL ? inputSpreadNFL : inputSpreadNCAA;
         System.out.println( "Fetching '" + url + "'");
 
@@ -470,7 +617,7 @@ public class Util {
                         }
                     });
 
-                    Function<T,String> getter = g -> g.getSpread();
+                    Function<Game,String> getter = g -> g.getSpread();
                     int actualGame = askForRow(getter, games, teamOne.get(), teamTwo.get());
                     if (actualGame >= 0) {
                         games.get(actualGame).setSpread(String.valueOf(spread.get() * (teamOneIsFavorite ? 1.0 : -1.0)));
@@ -480,13 +627,11 @@ public class Util {
         }
 
         catch (Exception e) {
-            e.printStackTrace(System.out);
-            System.exit(0);
+            logAndExit(e);
         }
     }
 
-    public static <T extends Game> void grabSagarin(List<T> games) {
-        boolean isNFL = !(games.get(0) instanceof NCAAGame);
+    public void grabSagarin() {
         String url = isNFL ? inputSagarinNFL : inputSagarinNCAA;
         System.out.println( "Fetching '" + url + "'");
 
@@ -550,13 +695,11 @@ public class Util {
         }
 
         catch (Exception e) {
-            System.out.println("Exception occurred: " + e);
-            System.exit(0);
+            logAndExit(e);
         }
     }
 
-    public static <T extends Game> void grabMassey(List<T> games) {
-        boolean isNFL = !(games.get(0) instanceof NCAAGame);
+    public void grabMassey() {
         String url = isNFL ? inputMasseyNFL : inputMasseyNCAA;
         System.out.println( "Fetching '" + url + "'");
 
@@ -613,7 +756,7 @@ public class Util {
                 });
 
                 if (shouldIterate.get()) {
-                    Function<T,String> getter = g -> g.getMassey();
+                    Function<Game,String> getter = g -> g.getMassey();
                     int actualGame = askForRow(getter, games, home.get(), away.get());
                     if (actualGame >= 0) {
                         games.get(actualGame).setMassey(String.valueOf(spread));
@@ -623,81 +766,11 @@ public class Util {
         }
 
         catch (Exception e) {
-            e.printStackTrace(System.out);
-            System.exit(0);
+            logAndExit(e);
         }
     }
 
-    public static void grabSandPScrape(List<NCAAGame> games) {
-        boolean homeTeamFailure = false;
-        boolean awayTeamFailure = false;
-        for (int i = 0; i < games.size(); i++) {
-            NCAAGame game = games.get(i);
-            String homeTeam = game.getHome();
-            String awayTeam = game.getAway();
-            String homeUrl;
-            String awayUrl;
-            try {
-                homeUrl = inputSP.replaceAll("%team%", encode(homeTeam.toLowerCase(), "UTF-8").replace("+", "-"));
-                awayUrl = inputSP.replaceAll("%team%", encode(awayTeam.toLowerCase(), "UTF-8").replace("+", "-"));
-            } catch (UnsupportedEncodingException e) {
-                break;
-            }
-
-            System.out.println("Fetching '" + (homeTeamFailure ? awayUrl : homeUrl) + "'");
-
-            try {
-                Document page = null;
-                try {
-                    page = connect(homeTeamFailure ? awayUrl : homeUrl).get();
-                } catch (HttpStatusException ex) {
-                    if (ex.getStatusCode() >= 300) {
-                        if (!homeTeamFailure) {
-                            --i;
-                        }
-                        homeTeamFailure = !homeTeamFailure;
-                        continue;
-                    }
-                }
-
-                Element predictionTable = page.select("table").get(1);
-                if (!predictionTable.toString().contains("Cumulative")) {
-                    System.out.println("The second table didn't look like the predictions table, continuing on.");
-                    continue;
-                }
-
-                Elements predictionsRows = predictionTable.select("tr");
-                for (int j = 1; j < predictionsRows.size()+1; j++) {
-                    Element currentPrediction = predictionsRows.get(j);
-                    DateTime currentDate = new DateTime();
-                    DateTime thisPastMonday = new DateTime().withWeekyear(currentDate.getWeekyear()).withYear(2018).withDayOfWeek(1).withHourOfDay(0);
-                    DateTime inAWeek = thisPastMonday.plusWeeks(1);
-
-                    String nextGameString = currentPrediction.select("td").get(0).childNode(0).toString().trim();
-                    DateTimeFormatter format = DateTimeFormat.forPattern("d-MMM");
-                    DateTime gameDate = format.withLocale(ENGLISH).parseDateTime(nextGameString).withYear(thisPastMonday.getYear()).withHourOfDay(22);
-
-                    if (gameDate.getMillis() < thisPastMonday.getMillis() || gameDate.getMillis() > inAWeek.getMillis()) {
-                        System.out.println("Something weird with the next game date. Continuing.");
-                        continue;
-                    } else {
-                        String spread = currentPrediction.select("td").get(5).childNode(0).toString();
-                        if (!homeTeamFailure) {
-                            spread = "-" + spread;
-                        }
-                        game.setSAndP(spread);
-                        homeTeamFailure = false;
-                        break;
-                    }
-                }
-
-            } catch (Exception e) {
-                e.printStackTrace(System.out);
-            }
-        }
-    }
-
-    public static void grabSandP(List<NCAAGame> games) {
+    public void grabSandP() {
         System.out.println("Fetching sAndP predictions");
 
         try {
@@ -719,7 +792,7 @@ public class Util {
                 String cleanedAway = cleanNCAATeamName(away);
 
                 AtomicBoolean shouldIterate = new AtomicBoolean(true);
-                games.stream().filter(g -> shouldIterate.get()).filter(g -> g.getSAndP() == null).forEach(g -> {
+                games.stream().filter(g -> shouldIterate.get()).map(g -> {return ((NCAAGame)g);}).filter(g -> g.getSAndP() == null).forEach(g -> {
                     if (similarity(g.getHome(), cleanedHome) == 1.0 || similarity(g.getAway(), cleanedAway) == 1.0) {
                         g.setSAndP((homeIsSPFavorite ? "-" : "") + spMargin);
                         g.setFPlus((homeIsFPFavorite ? "-" : "") + fpMargin);
@@ -736,8 +809,7 @@ public class Util {
         }
     }
 
-    public static <T extends Game> void grabDRatings(List<T> games) {
-        boolean isNFL = !(games.get(0) instanceof NCAAGame);
+    public void grabDRatings() {
         String url = isNFL ? inputURIDRNFL : inputURIDRNCAA;
         System.out.println( "Fetching '" + url + "'");
 
@@ -780,22 +852,20 @@ public class Util {
         }
 
         catch (Exception e) {
-            e.printStackTrace(System.out);
-            System.exit(0);
+            logAndExit(e);
         }
     }
 
-    public static <T extends Game> void grabFox(List<T> gameList) {
-        boolean isNFL = !(gameList.get(0) instanceof NCAAGame);
+    public void grabFox() {
         String url = isNFL ? inputURIFoxNFL : inputURIFoxNCAA;
         System.out.println( "Fetching '" + url + "'");
 
         try
         {
             Document page = connect(url).get();
-            Elements games = page.select("div[class=wisbb_predictionChip]");
+            Elements gamesElements = page.select("div[class=wisbb_predictionChip]");
 
-            for (Element game : games) {
+            for (Element game : gamesElements) {
                 Elements teams = game.select("span[class=wisbb_teamName]");
                 if (teams.size() == 0) {
                     continue;
@@ -823,8 +893,8 @@ public class Util {
                     prediction = (Double)result;
                 }
 
-                for (int j = 0; j < gameList.size(); j++) {
-                    Game current = gameList.get(j);
+                for (int j = 0; j < games.size(); j++) {
+                    Game current = games.get(j);
                     double homeResult =  similarity(current.getHome(), home);
                     double awayResult =  similarity(current.getAway(), away);
                     if (homeResult == 1 || awayResult == 1) {
@@ -845,23 +915,21 @@ public class Util {
         }
 
         catch (Exception e) {
-            e.printStackTrace(System.out);
-            System.exit(0);
+            logAndExit(e);
         }
     }
 
-    public static <T extends Game> void grabOddsShark(List<T> gameList) {
-        boolean isNFL = !(gameList.get(0) instanceof NCAAGame);
+    public void grabOddsShark() {
         String url = isNFL ? inputURIOSNFL : inputURIOSNCAA;
         System.out.println( "Fetching '" + url + "'");
 
         try
         {
             Document page = connect(url).get();
-            Elements games = page.select("table");
+            Elements gamesElements = page.select("table");
 
-            for (int i = 0; i < games.size(); i++) {
-                Element game = games.get(i);
+            for (int i = 0; i < gamesElements.size(); i++) {
+                Element game = gamesElements.get(i);
                 Elements teams = game.getElementsByClass("name-long");
                 if (teams.size() != 2) {
                     continue;
@@ -889,7 +957,7 @@ public class Util {
                 AtomicBoolean shouldIterate = new AtomicBoolean(true);
                 String finalHome = home;
                 String finalAway = away;
-                gameList.stream().filter(g -> shouldIterate.get()).forEach(g -> {
+                games.stream().filter(g -> shouldIterate.get()).filter(g -> !isNullOrEmpty(g.getOddsShark())).forEach(g -> {
                     double homeResult =  similarity(g.getHome(), finalHome);
                     double awayResult =  similarity(g.getAway(), finalAway);
                     if (homeResult == 1 || awayResult == 1) {
@@ -908,22 +976,21 @@ public class Util {
                 });
 
                 if (shouldIterate.get()) {
-                    Function<T,String> getter = g -> g.getOddsShark();
-                    int actualGame = askForRow(getter, gameList, home, away);
+                    Function<Game,String> getter = g -> g.getOddsShark();
+                    int actualGame = askForRow(getter, games, home, away);
                     if (actualGame >= 0) {
-                        gameList.get(actualGame).setOddsShark(String.valueOf(margin));
+                        games.get(actualGame).setOddsShark(String.valueOf(margin));
                     }
                 }
             }
         }
 
         catch (Exception e) {
-            e.printStackTrace(System.out);
-            System.exit(0);
+            logAndExit(e);
         }
     }
 
-    private static String addMascot(String city) {
+    private String addMascot(String city) {
         if (city.contains("Los Angeles")) {
             return city;
         }
@@ -935,7 +1002,7 @@ public class Util {
         return city;
     }
 
-    private static String cleanNCAATeamName(String teamName) {
+    private String cleanNCAATeamName(String teamName) {
         return teamName.replaceAll(" St$"," State").replaceFirst("E ", "Eastern ").replaceFirst("^C ", "Central ").replaceAll("&amp;","&")
                 .replace("FL ", "Florida ").replaceAll("Intl$", "International").replace("FIU","Florida International").replace("AM","A&M").replace("NC ", "North Carolina ")
                 .replaceAll(" St.$"," State").replace("<b>","").replace("</b>","").replaceFirst("^W ", "Western ").replaceFirst("^Ga ", "Georgia ")
@@ -948,14 +1015,14 @@ public class Util {
                 .replace("Texas St-San Marcos", "Texas State").replace("UL-Monroe", "Louisiana Monroe").replace("Ole Miss", "Mississippi").trim();
     }
 
-    private static String cleanNFLTeamName(String teamName) {
+    private String cleanNFLTeamName(String teamName) {
         return teamName.replaceFirst("NY", "New York")
                 .replaceFirst("N.Y.", "New York")
                 .replaceFirst("LA", "Los Angeles")
                 .replaceFirst("L.A.", "Los Angeles");
     }
 
-    private static <T extends Game> int askForRow(Function<T, String> getter, List<T> games, String home, String away) {
+    private <T extends Game> int askForRow(Function<T, String> getter, List<T> games, String home, String away) {
         BufferedReader br = null;
 
         try {
@@ -974,15 +1041,14 @@ public class Util {
             return Integer.valueOf(input);
 
         } catch (IOException e) {
-            e.printStackTrace(System.out);
-            System.exit(0);
+            logAndExit(e);
         } catch (NumberFormatException e) {
             return -1;
         }
         return -1;
     }
 
-    private static double similarity(String s1, String s2) {
+    private double similarity(String s1, String s2) {
         String longer = s1, shorter = s2;
         if (s1.length() < s2.length()) { // longer should always have greater length
             longer = s2; shorter = s1;
@@ -995,9 +1061,7 @@ public class Util {
 
     }
 
-    public static <T extends Game> void printResults(List<T> games) {
-        boolean isNFL = !(games.get(0) instanceof NCAAGame);
-
+    public void printResults() {
         try {
             File file = new File(format("/Users/patrick.stoneburner/Desktop/%s_picks.csv", isNFL ? "nfl" : "ncaa"));
             if (!file.exists()) {
@@ -1018,7 +1082,12 @@ public class Util {
             bw.close();
 
         } catch (Exception e) {
-            System.exit(0);
+            logAndExit(e);
         }
+    }
+
+    private void logAndExit(Exception e) {
+        e.printStackTrace(System.out);
+        System.exit(0);
     }
 }

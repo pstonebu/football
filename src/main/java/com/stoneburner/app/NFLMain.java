@@ -1,25 +1,20 @@
 package com.stoneburner.app;
 
-import java.util.List;
-
-import static com.google.common.collect.Lists.newArrayList;
-import static com.stoneburner.app.Util.*;
-
 public class NFLMain
 {
     public static void main( String[] args ) {
-        List<Game> games = newArrayList();
+        Util util = new Util(true);
 
-        grabPowerRank(games);
-        grabSpread(games);
-        grabSagarin(games);
-        grabMassey(games);
-        grab538(games);
-        grabDRatings(games);
-        grabFox(games);
-        grabOddsShark(games);
+        util.grabPowerRank();
+        util.grabSpread();
+        util.grabSagarin();
+        util.grabMassey();
+        util.grab538();
+        util.grabDRatings();
+        util.grabFox();
+        util.grabOddsShark();
 
-        printResults(games);
+        util.printResults();
 
         System.out.println("Done!");
     }

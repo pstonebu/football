@@ -3,25 +3,24 @@ package com.stoneburner.app;
 import java.util.List;
 
 import static com.google.common.collect.Lists.newArrayList;
-import static com.stoneburner.app.Util.*;
 
 public class NCAAMain {
 
     public static void main( String[] args ) {
-        List<NCAAGame> games = newArrayList();
+        Util util = new Util(false);
 
-        grabPowerRank(games);
-        grabAtomic(games);
-        grab538(games);
-        grabSpread(games);
-        grabSagarin(games);
-        grabMassey(games);
-        grabSandP(games);
-        grabDRatings(games);
+        util.grabPowerRank();
+        util.grabAtomic();
+        util.grab538();
+        util.grabSpread();
+        util.grabSagarin();
+        util.grabMassey();
+        util.grabSandP();
+        util.grabDRatings();
         //disabling fox until they prove they don't suck
-        //grabFox(games);
-        grabOddsShark(games);
-        printResults(games);
+        //util.grabFox();
+        util.grabOddsShark();
+        util.printResults();
 
         System.out.println("Done!");
     }

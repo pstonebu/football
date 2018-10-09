@@ -1,27 +1,21 @@
 package com.stoneburner.app;
 
-import java.util.List;
-
-import static com.google.common.collect.Lists.newArrayList;
-import static com.stoneburner.app.Util.*;
-
 public class BowlMain {
 
     public static void main( String[] args ) {
-        List<NCAAGame> games = newArrayList();
-        
-        grabPowerRank(games);
-        grabAtomic(games);
-        grab538(games);
-        grabSpread(games);
-        grabSagarin(games);
-        grabMassey(games);
-        grabSandP(games);
-        grabDRatings(games);
-        grabFox(games);
-        grabOddsShark(games);
+        Util util = new Util(false);
 
-        printResults(games);
+        util.grabPowerRank();
+        util.grabAtomic();
+        util.grab538();
+        util.grabSpread();
+        util.grabSagarin();
+        util.grabMassey();
+        util.grabSandP();
+        util.grabDRatings();
+        util.grabFox();
+        util.grabOddsShark();
+        util.printResults();
 
         System.out.println("Done!");
     }
