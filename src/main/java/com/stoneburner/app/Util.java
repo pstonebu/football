@@ -254,7 +254,7 @@ public class Util {
                 String home = cleanNCAATeamName(currentRowParts.get(3).childNode(0).childNode(0).toString());
                 String awayScore = currentRowParts.get(2).childNode(0).toString();
                 String homeScore = currentRowParts.get(4).childNode(0).toString();
-                String margin = String.valueOf(Integer.valueOf(awayScore) - Integer.valueOf(homeScore));
+                final AtomicReference<String> margin = new AtomicReference(String.valueOf(Integer.valueOf(awayScore) - Integer.valueOf(homeScore)));
 
                 DateTimeFormatter format = DateTimeFormat.forPattern("MM/dd");
                 DateTime gameDate = format.withLocale(ENGLISH).parseDateTime(date).withYear(thisPastMonday.getYear()).withHourOfDay(22);
@@ -266,30 +266,31 @@ public class Util {
                 }
 
                 //Find a spot in our array for these values
-                for (int j = 0; j < games.size(); j++) {
-                    NCAAGame game = games.get(j);
-                    double homeResult =  similarity(game.getHome(), home);
-                    double awayResult =  similarity(game.getAway(), away);
+                AtomicBoolean shouldIterate = new AtomicBoolean(true);
+                games.stream().filter(g -> shouldIterate.get()).filter(g -> !isNullOrEmpty(g.getAtomic())).forEach(g -> {
+                    double homeResult =  similarity(g.getHome(), home);
+                    double awayResult =  similarity(g.getAway(), away);
                     if (homeResult == 1 || awayResult == 1) {
-                        game.setAtomic(margin);
-                        return;
+                        g.setAtomic(margin.get());
+                        shouldIterate.set(false);
                     //maybe the two are reversed?
                     } else {
-                        homeResult =  similarity(game.getHome(), away);
-                        awayResult =  similarity(game.getAway(), home);
+                        homeResult =  similarity(g.getHome(), away);
+                        awayResult =  similarity(g.getAway(), home);
 
                         if (homeResult == 1 || awayResult == 1) {
-                            margin = String.valueOf(Integer.valueOf(margin) * -1);
-                            game.setAtomic(margin);
-                            return;
+                            g.setAtomic("-" + margin.get());
+                            shouldIterate.set(false);
                         }
                     }
-                }
+                });
 
-                Function<NCAAGame,String> getter = g -> g.getAtomic();
-                int actualRow = askForRow(getter, games, home, away);
-                if (actualRow >= 0) {
-                    games.get(actualRow).setAtomic(margin);
+                if (shouldIterate.get()) {
+                    Function<NCAAGame, String> getter = g -> g.getAtomic();
+                    int actualRow = askForRow(getter, games, home, away);
+                    if (actualRow >= 0) {
+                        games.get(actualRow).setAtomic(margin.get());
+                    }
                 }
 
             }
