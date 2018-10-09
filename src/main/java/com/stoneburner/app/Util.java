@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
+import static com.google.common.base.Strings.isNullOrEmpty;
 import static java.lang.Double.valueOf;
 import static java.lang.Math.abs;
 import static java.lang.String.format;
@@ -285,8 +286,8 @@ public class Util {
                     }
                 }
 
-                int actualRow = -1;
-                //actualRow = askForRow(10, home, away);
+                Function<NCAAGame,String> getter = g -> g.getAtomic();
+                int actualRow = askForRow(getter, games, home, away);
                 if (actualRow >= 0) {
                     games.get(actualRow).setAtomic(margin);
                 }
@@ -962,7 +963,7 @@ public class Util {
             System.out.println(format("Which game is %s vs. %s? ", home, away));
             AtomicInteger count = new AtomicInteger(0);
             games.stream().forEach(g -> {
-                if (getter.apply(g) == null) {
+                if (isNullOrEmpty(getter.apply(g))) {
                     System.out.println(format("%d) %s vs. %s", count.get(), g.getHome(), g.getAway()));
                 }
                 count.incrementAndGet();
@@ -995,7 +996,6 @@ public class Util {
 
     public static <T extends Game> void printResults(List<T> games) {
         boolean isNFL = !(games.get(0) instanceof NCAAGame);
-        BufferedWriter bw = null;
 
         try {
             File file = new File(format("/Users/patrick.stoneburner/Desktop/%s_picks.csv", isNFL ? "nfl" : "ncaa"));
@@ -1004,47 +1004,19 @@ public class Util {
             }
 
             FileWriter fw1 = new FileWriter(file);
-            bw = new BufferedWriter(fw1);
-            if (isNFL) {
-                bw.write("Home Team, Away Team, PR, Dratings, Fox, OS, 538, Massey, Sagarin, Spread");
-            } else {
-                bw.write("Home Team, Away Team, PR, Dratings, Fox, OS, 538, Massey, Sagarin, S&P+, F/+, Atomic, Spread");
-            }
+            final BufferedWriter bw = new BufferedWriter(fw1);
+            bw.write(games.get(0).getHeader());
             bw.newLine();
 
-            for (int i = 0; i < games.size(); i++) {
-                if (isNFL) {
-                    Game game = games.get(i);
-                    bw.write(format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", game.getHome(), game.getAway(),
-                            game.getPowerRank(),
-                            game.getDRatings(),
-                            game.getFox(),
-                            game.getOddsShark(),
-                            game.getFiveThirtyEight(),
-                            game.getMassey(),
-                            game.getSagarin(),
-                            game.getSpread()));
-                } else {
-                    NCAAGame game = (NCAAGame) games.get(i);
-                    bw.write(format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", game.getHome(), game.getAway(),
-                            game.getPowerRank(),
-                            game.getDRatings(),
-                            game.getFox(),
-                            game.getOddsShark(),
-                            game.getFiveThirtyEight(),
-                            game.getMassey(),
-                            game.getSagarin(),
-                            game.getSAndP(),
-                            game.getFPlus(),
-                            game.getAtomic(),
-                            game.getSpread()));
-                }
-                bw.newLine();
-            }
-
+            games.stream().forEach(g -> {
+                try {
+                    bw.write(g.toString());
+                    bw.newLine();
+                } catch (IOException ex) {/*no-op*/}
+            });
             bw.close();
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             System.exit(0);
         }
     }
