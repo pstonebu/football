@@ -3,7 +3,7 @@ package com.stoneburner.app;
 public class NFLMain
 {
     public static void main( String[] args ) {
-        Util util = new Util(true);
+        NFLUtil util = new NFLUtil();
 
         util.grabPowerRank();
         util.grabSpread();

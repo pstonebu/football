@@ -1,13 +1,9 @@
 package com.stoneburner.app;
 
-import java.util.List;
-
-import static com.google.common.collect.Lists.newArrayList;
-
 public class NCAAMain {
 
     public static void main( String[] args ) {
-        Util util = new Util(false);
+        NCAAUtil util = new NCAAUtil();
 
         util.grabPowerRank();
         util.grabAtomic();
