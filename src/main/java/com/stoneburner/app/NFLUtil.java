@@ -1,12 +1,12 @@
 package com.stoneburner.app;
 
-import org.joda.time.DateTime;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.util.Map;
 
+import static java.lang.String.format;
 import static org.apache.commons.lang3.StringUtils.isEmpty;
 import static org.joda.time.format.DateTimeFormat.forPattern;
 import static org.jsoup.Jsoup.connect;
@@ -14,7 +14,14 @@ import static org.jsoup.Jsoup.connect;
 public class NFLUtil extends Util {
 
     public NFLUtil() {
-        inputMasseyNFL = inputMasseyNFL.replace("$dt$", forPattern("yyyyMMdd").print(new DateTime()));
+
+        inputMassey = format(inputMassey, "nfl", forPattern("yyyyMMdd").print(today));
+        inputURIDR = format(inputURIDR, "nfl");
+        inputURIOS = format(inputURIOS, "nfl");
+        inputURIFox = "http://www.foxsports.com/nfl/predictions";
+        inputSagarin = format(inputSagarin, "nfl");
+        inputSpread = format(inputSpread, "nfl");
+        input538 = "https://projects.fivethirtyeight.com/2018-nfl-predictions/games/";
 
         teamMascotToCity.put("Titans","Tennessee");
         teamMascotToCity.put("Jaguars","Jacksonville");
@@ -84,12 +91,12 @@ public class NFLUtil extends Util {
     }
 
     protected void grab538() {
-        System.out.println( "Fetching '" + input538NFL + "'");
+        System.out.println( "Fetching '" + input538 + "'");
 
         //Execute client with our method
         try
         {
-            Document page = connect(input538NFL).get();
+            Document page = connect(input538).get();
 
             Element week = page.select("section[class=week]").get(0);
             Elements rows = week.select("tr[class=tr]");

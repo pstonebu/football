@@ -6,6 +6,7 @@ public class NCAAMain {
         NCAAUtil util = new NCAAUtil();
 
         util.grabPowerRank();
+        util.grabFPI();
         util.grabAtomic();
         util.grab538();
         util.grabSpread();

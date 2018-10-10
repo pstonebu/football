@@ -3,7 +3,7 @@ package com.stoneburner.app;
 public class BowlMain {
 
     public static void main( String[] args ) {
-        Util util = new NCAAUtil();
+        NCAAUtil util = new NCAAUtil();
 
         util.grabPowerRank();
         util.grabAtomic();
