@@ -1,5 +1,6 @@
 package com.stoneburner.app;
 
+import org.joda.time.DateTime;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -8,19 +9,22 @@ import java.util.Map;
 
 import static java.lang.String.format;
 import static org.apache.commons.lang3.StringUtils.isEmpty;
+import static org.joda.time.Weeks.weeksBetween;
 import static org.joda.time.format.DateTimeFormat.forPattern;
 import static org.jsoup.Jsoup.connect;
 
 public class NFLUtil extends Util {
 
     public NFLUtil() {
+        int week = weeksBetween(new DateTime(1536451200000l), today).getWeeks()+2;
+        isVegasWeek = week == 10;
 
         inputMassey = format(inputMassey, "nfl", forPattern("yyyyMMdd").print(today));
         inputURIDR = format(inputURIDR, "nfl");
         inputURIOS = format(inputURIOS, "nfl");
         inputURIFox = "http://www.foxsports.com/nfl/predictions";
         inputSagarin = format(inputSagarin, "nfl");
-        inputSpread = format(inputSpread, "nfl");
+        inputSpread = format(inputSpread, "nfl", isVegasWeek ? "las-vegas" : "offshore");
         input538 = "https://projects.fivethirtyeight.com/2018-nfl-predictions/games/";
 
         teamMascotToCity.put("Titans","Tennessee");
@@ -149,10 +153,6 @@ public class NFLUtil extends Util {
 
     protected String getCityFromMascot(String mascot) {
         return teamMascotToCity.get(mascot);
-    }
-
-    protected Boolean isNfl() {
-        return true;
     }
 
     protected Game getNewGame() {

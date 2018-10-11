@@ -22,6 +22,7 @@ public class NCAAUtil extends Util {
     public NCAAUtil() {
         DateTime game1 = new DateTime(1535760000000l);
         int week = weeksBetween(game1, today).getWeeks()+2;
+        isVegasWeek = week == 11;
         inputURIFox = format("https://www.foxsports.com/college-football/predictions?season=2018&seasonType=1&week=%d&group=-3", week);
 
         inputMassey = format(inputMassey, "cf", forPattern("yyyyMMdd").print(today));
@@ -29,7 +30,7 @@ public class NCAAUtil extends Util {
         inputURIDR = format(inputURIDR, "ncaa");
         inputURIOS = format(inputURIOS, "ncaaf");
         inputSagarin = format(inputSagarin, "cf");
-        inputSpread = format(inputSpread, "college-football");
+        inputSpread = format(inputSpread, "college-football", isVegasWeek ? "las-vegas" : "offshore");
         input538 = "https://projects.fivethirtyeight.com/2018-college-football-predictions/sims.csv";
 
         teamToId.put("Air Force", 2005);
@@ -235,8 +236,10 @@ public class NCAAUtil extends Util {
                 boolean homeIsFPFavorite = fPlusPrediction.startsWith(home);
                 String fpMargin = fPlusPrediction.substring(fPlusPrediction.indexOf(" by ") + 4).trim();
 
-                Integer homeId = teamToId.get(cleanTeamName(home));
-                Integer awayId = teamToId.get(cleanTeamName(away));
+                home = cleanTeamName(home);
+                away = cleanTeamName(away);
+                Integer homeId = teamToId.get(home);
+                Integer awayId = teamToId.get(away);
 
                 if (homeId != null && awayId != null) {
                     NCAAGame game = (NCAAGame)idToGame.get(homeId);
@@ -371,7 +374,7 @@ public class NCAAUtil extends Util {
                 .replaceAll("Ga Southern", "Georgia Southern")
                 .replaceAll("^Kent$", "Kent State")
                 .replaceAll("^(ULM|Louisiana-([Mm])onroe|UL-Monroe)$","Louisiana Monroe")
-                .replaceAll("(Louisiana-([Ll])afayette|ULL)", "Louisiana")
+                .replaceAll("((UL|Louisiana)-([Ll])afayette|ULL)", "Louisiana")
                 .replaceAll("(Louisiana State|Lsu)", "LSU")
                 .replaceAll("(Miami( |-)(FL|florida)|^Miami$)", "Miami (FL)")
                 .replaceAll("Miami( |-)(OH|ohio)", "Miami (OH)")
@@ -399,10 +402,6 @@ public class NCAAUtil extends Util {
 
     protected String getCityFromMascot(String mascot) {
         return mascot;
-    }
-
-    protected Boolean isNfl() {
-        return false;
     }
 
     protected NCAAGame getNewGame() {

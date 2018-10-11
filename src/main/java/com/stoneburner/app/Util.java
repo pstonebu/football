@@ -41,7 +41,7 @@ public class Util {
     protected String inputURIFox = "";
     protected String inputSagarin = "http://sagarin.com/sports/%ssend.htm";
     protected String inputMassey = "http://www.masseyratings.com/predjson.php?s=%s&sub=11604&dt=%s";
-    protected String inputSpread = "http://www.vegasinsider.com/%s/odds/offshore/2/";
+    protected String inputSpread = "http://www.vegasinsider.com/%s/odds/%s/2/";
     protected String input538 = "";
 
     protected HashMap<String,String> teamMascotToCity = newHashMap();
@@ -50,6 +50,7 @@ public class Util {
     protected HashMap<Integer,Game> idToGame = newHashMap();
 
     protected DateTime today = new DateTime();
+    protected boolean isVegasWeek = false;
 
     public void grabPowerRank() {
         System.out.println( "Fetching '" + inputURIPR + "'");
@@ -123,7 +124,8 @@ public class Util {
 
             for (int i = 0; i < rows.size(); i++) {
                 Element current = rows.get(i);
-                Elements fiveDimes = current.select("a[href$=#BU]");
+                String cssQuery = new StringBuilder("a[href$=#").append(isVegasWeek ? "E" : "BU").append("]").toString();
+                Elements fiveDimes = current.select(cssQuery);
                 if (fiveDimes.size() == 0) {
                     //if this is just an info row or there's no spread posted, move on
                     continue;
@@ -132,7 +134,7 @@ public class Util {
                 String teamOne = cleanTeamName(current.select("a[class=tabletext]").get(0).childNode(0).toString());
                 String teamTwo = cleanTeamName(current.select("a[class=tabletext]").get(1).childNode(0).toString());
 
-                List<String> spreadParts = current.select("a[href$=#BU]").get(0).childNodes().stream()
+                List<String> spreadParts = current.select(cssQuery).get(0).childNodes().stream()
                         .filter(n -> (n instanceof TextNode))
                         .map(n -> unescapeHtml4(n.toString().replace("PK","-0")))
                         .collect(toList())
@@ -414,7 +416,7 @@ public class Util {
     }
 
     protected Boolean isNfl() {
-        return null;
+        return this instanceof NFLUtil;
     }
 
     protected <T extends Game> T getNewGame() {
