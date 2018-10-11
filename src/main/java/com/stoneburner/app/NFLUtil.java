@@ -133,10 +133,8 @@ public class NFLUtil extends Util {
     }
 
     protected String cleanTeamName(String teamName) {
-        return teamName.replaceFirst("NY", "New York")
-                .replaceFirst("N.Y.", "New York")
-                .replaceFirst("LA", "Los Angeles")
-                .replaceFirst("L.A.", "Los Angeles");
+        return teamName.replaceAll("(NY|N.Y.)", "New York")
+                .replaceAll("(LA|L.A.)", "Los Angeles");
     }
 
     protected String removeMascot(String city) {
