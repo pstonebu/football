@@ -247,7 +247,7 @@ public class NCAAUtil extends Util {
 
                 if (homeId != null && awayId != null) {
                     NCAAGame game = (NCAAGame)idToGame.get(homeId);
-                    if (game != null && game.getHome().equals(home) && game.getAway().equals(away)) {
+                    if (isCorrectGame(game, away, home)) {
                         game.setSAndP((homeIsSPFavorite ? "-" : "") + spMargin);
                         game.setFPlus((homeIsFPFavorite ? "-" : "") + fpMargin);
                     } else {
@@ -294,7 +294,9 @@ public class NCAAUtil extends Util {
                 Integer homeId = teamToId.get(home);
                 if (awayId != null && homeId != null) {
                     NCAAGame game = (NCAAGame)idToGame.get(homeId);
-                    game.setAtomic(margin);
+                    if (isCorrectGame(game, away, home)) {
+                        game.setAtomic(margin);
+                    }
                 } else {
                     logBadTeam(away, home);
                 }
@@ -307,7 +309,7 @@ public class NCAAUtil extends Util {
     public void grabFPI() {
         log("Fetching FPI predictions");
 
-        games.stream().forEach(g -> {
+        games.stream().map(g -> {return (NCAAGame)g;}).forEach(g -> {
             try {
                 Elements tables = connect(format(inputFPI, teamToId.get(g.getAway()))).select("table");
                 Elements gameRows = tables.get(tables.size()-1).select("tr");
@@ -349,7 +351,7 @@ public class NCAAUtil extends Util {
                         } else {
                             spread = pow((winPct / 49.25), (1.0/.194));
                         }
-                        ((NCAAGame)g).setFpi(String.valueOf(spread));
+                        g.setFpi(String.valueOf(spread));
                         break;
                     } else {
                         logBadTeam(g.getAway(), opponent);

@@ -161,10 +161,12 @@ public class Util {
                     Integer teamTwoId = teamToId.get(teamTwo);
                     if (teamOneId != null && teamTwoId != null) {
                         Game game = idToGame.get(teamOneId);
-                        if (game.getHome().equals(teamOne)) {
-                            game.setSpread(String.valueOf((teamOneIsFavorite ? -1.0 : 1.0) * spread));
-                        } else if (game.getAway().equals(teamOne)){
-                            game.setSpread(String.valueOf((teamOneIsFavorite ? 1.0 : -1.0) * spread));
+                        if (isCorrectGame(game, teamOne, teamTwo)) {
+                            if (game.getHome().equals(teamOne)) {
+                                game.setSpread(String.valueOf((teamOneIsFavorite ? -1.0 : 1.0) * spread));
+                            } else if (game.getAway().equals(teamOne)) {
+                                game.setSpread(String.valueOf((teamOneIsFavorite ? 1.0 : -1.0) * spread));
+                            }
                         }
                     } else {
                         logBadTeam(teamOne, teamTwo);
@@ -210,7 +212,9 @@ public class Util {
 
                 if (favoriteId != null && underdogId != null) {
                     Game game = idToGame.get(favoriteId);
-                    game.setSagarin(String.valueOf((game.getHome().equals(cleanedFavorite) ? -1.0 : 1.0) * averageSpread));
+                    if (isCorrectGame(game, cleanedFavorite, cleanedUnderdog)) {
+                        game.setSagarin(String.valueOf((game.getHome().equals(cleanedFavorite) ? -1.0 : 1.0) * averageSpread));
+                    }
                 } else {
                     logBadTeam(cleanedFavorite, cleanedUnderdog);
                 }
@@ -259,7 +263,9 @@ public class Util {
 
                 if (homeId != null && awayId != null) {
                     Game game = idToGame.get(homeId);
-                    game.setMassey(String.valueOf((game.getHome().equals(home) ? 1.0 : -1.0) * spread));
+                    if (isCorrectGame(game, away, home)) {
+                        game.setMassey(String.valueOf((game.getHome().equals(home) ? 1.0 : -1.0) * spread));
+                    }
                 } else {
                     logBadTeam(home, away);
                 }
@@ -296,7 +302,9 @@ public class Util {
                 Integer awayId = teamToId.get(away);
                 if (homeId != null && awayId != null) {
                     Game game = idToGame.get(homeId);
-                    game.setDRatings(String.valueOf((game.getHome().equals(home) ? 1.0 : -1.0) * margin));
+                    if (isCorrectGame(game, away, home)) {
+                        game.setDRatings(String.valueOf((game.getHome().equals(home) ? 1.0 : -1.0) * margin));
+                    }
                 } else {
                     logBadTeam(home, away);
                 }
@@ -344,7 +352,9 @@ public class Util {
 
                 if (homeId != null && awayId != null) {
                     Game game = idToGame.get(homeId);
-                    game.setFox(String.valueOf((game.getHome().equals(home) ? 1.0 : -1.0) * prediction));
+                    if (isCorrectGame(game, away, home)) {
+                        game.setFox(String.valueOf((game.getHome().equals(home) ? 1.0 : -1.0) * prediction));
+                    }
                 } else {
                     logBadTeam(home, away);
                 }
@@ -391,7 +401,9 @@ public class Util {
                 Integer awayId = teamToId.get(away);
                 if (homeId != null && awayId != null) {
                     Game game = idToGame.get(homeId);
-                    game.setOddsShark(String.valueOf((game.getHome().equals(home) ? 1.0 : -1.0) * margin));
+                    if (isCorrectGame(game, away, home)) {
+                        game.setOddsShark(String.valueOf((game.getHome().equals(home) ? 1.0 : -1.0) * margin));
+                    }
                 } else {
                     logBadTeam(home, away);
                 }
@@ -468,5 +480,12 @@ public class Util {
     
     protected void log(String message) {
         System.out.println(message);
+    }
+
+    protected boolean isCorrectGame(Game game, String expectedAway, String expectedHome) {
+        String actualAway = game.getAway();
+        String actualHome = game.getHome();
+        return game != null && (actualHome.equals(expectedHome) && actualAway.equals(expectedAway)) ||
+                (actualAway.equals(expectedHome) && actualHome.equals(expectedAway));
     }
 }

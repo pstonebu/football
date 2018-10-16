@@ -105,8 +105,8 @@ public class NFLUtil extends Util {
             Elements rows = week.select("tr[class=tr]");
 
             for (int i = 0; i < rows.size(); i=i+3) {
-                String awayTeam = cleanTeamName(rows.get(i+1).select("td[class=td text team]").get(0).childNodes().get(0).toString().trim());
-                String homeTeam = cleanTeamName(rows.get(i+2).select("td[class=td text team]").get(0).childNodes().get(0).toString().trim());
+                String away = cleanTeamName(rows.get(i+1).select("td[class=td text team]").get(0).childNodes().get(0).toString().trim());
+                String home = cleanTeamName(rows.get(i+2).select("td[class=td text team]").get(0).childNodes().get(0).toString().trim());
 
                 String awaySpread = rows.get(i+1).select("td[class=td number spread]").get(0).childNodes().get(0).toString().trim();
                 String homeSpread = rows.get(i+2).select("td[class=td number spread]").get(0).childNodes().get(0).toString().trim();
@@ -116,11 +116,13 @@ public class NFLUtil extends Util {
                     awaySpread = "+0.0";
                 }
 
-                Integer homeId = teamToId.get(homeTeam);
-                Integer awayId = teamToId.get(awayTeam);
+                Integer homeId = teamToId.get(home);
+                Integer awayId = teamToId.get(away);
                 if (homeId != null && awayId != null) {
                     Game game = idToGame.get(homeId);
-                    game.setFiveThirtyEight(!isEmpty(awaySpread) ? awaySpread.substring(1) : homeSpread);
+                    if (isCorrectGame(game, away, home)) {
+                        game.setFiveThirtyEight(!isEmpty(awaySpread) ? awaySpread.substring(1) : homeSpread);
+                    }
                 }
 
             }
