@@ -4,6 +4,7 @@ import lombok.NoArgsConstructor;
 import org.joda.time.DateTime;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.nodes.Node;
@@ -31,7 +32,6 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 import static org.apache.commons.text.StringEscapeUtils.unescapeHtml4;
 import static org.apache.commons.text.WordUtils.capitalizeFully;
-import static org.jsoup.Jsoup.connect;
 
 @NoArgsConstructor
 public class Util {
@@ -53,13 +53,13 @@ public class Util {
     protected boolean isVegasWeek = false;
 
     public void grabPowerRank() {
-        System.out.println( "Fetching '" + inputURIPR + "'");
+        log( "Fetching '" + inputURIPR + "'");
         int numGames = 0;
 
         //Execute client with our method
         try
         {
-            Document page = connect(inputURIPR).get();
+            Document page = connect(inputURIPR);
             Element leagueHeader = page.select("h2").stream()
                     .filter(e -> e.toString().contains(isNfl() ? "NFL" : "College Football"))
                     .findFirst()
@@ -90,11 +90,11 @@ public class Util {
                 Game game = getNewGame();
                 Integer homeId = teamToId.get(home);
                 if (homeId == null) {
-                    System.out.println("Could not find " + home + " in our map!");
+                    log("Could not find " + home + " in our map!");
                 }
                 Integer awayId = teamToId.get(away);
                 if (awayId == null) {
-                    System.out.println("Could not find " + away + " in our map!");
+                    log("Could not find " + away + " in our map!");
                 }
                 game.setHome(home);
                 game.setAway(away);
@@ -115,11 +115,11 @@ public class Util {
     }
 
     public void grabSpread() {
-        System.out.println( "Fetching '" + inputSpread + "'");
+        log( "Fetching '" + inputSpread + "'");
 
         try
         {
-            Document page = connect(inputSpread).get();
+            Document page = connect(inputSpread);
             Elements rows = page.select("table[class=frodds-data-tbl] tr");
 
             for (int i = 0; i < rows.size(); i++) {
@@ -179,11 +179,11 @@ public class Util {
     }
 
     public void grabSagarin() {
-        System.out.println( "Fetching '" + inputSagarin + "'");
+        log( "Fetching '" + inputSagarin + "'");
 
         try
         {
-            Document page = connect(inputSagarin).get();
+            Document page = connect(inputSagarin);
             Node predictionSection = page.select("a[name=Predictions]").get(0).parent().parent().parent().childNode(2);
             String[] rows = copyOfRange(predictionSection.toString().split("\r\n"), 8,
                     predictionSection.toString().split("\r\n").length);
@@ -223,12 +223,12 @@ public class Util {
     }
 
     public void grabMassey() {
-        System.out.println( "Fetching '" + inputMassey + "'");
+        log( "Fetching '" + inputMassey + "'");
 
         //Execute client with our method
         try
         {
-            String source = connect(inputMassey).ignoreContentType(true).get().body().text();
+            String source = connect(inputMassey).body().text();
 
             JSONObject json = new JSONObject(source);
             JSONArray gamesArray = json.getJSONArray("DI");
@@ -272,11 +272,11 @@ public class Util {
     }
 
     public void grabDRatings() {
-        System.out.println( "Fetching '" + inputURIDR + "'");
+        log( "Fetching '" + inputURIDR + "'");
 
         try
         {
-            Document page = connect(inputURIDR).get();
+            Document page = connect(inputURIDR);
             Elements rows = page.select("table[class=small-text]").get(isNfl() ? 0 : 1).select("tr");
 
             for (int i = 2; i < rows.size(); i = i + 2) {
@@ -309,11 +309,11 @@ public class Util {
     }
 
     public void grabFox() {
-        System.out.println( "Fetching '" + inputURIFox + "'");
+        log( "Fetching '" + inputURIFox + "'");
 
         try
         {
-            Document page = connect(inputURIFox).get();
+            Document page = connect(inputURIFox);
             Elements gamesElements = page.select("div[class=wisbb_predictionChip]");
 
             for (Element gameElement : gamesElements) {
@@ -357,11 +357,11 @@ public class Util {
     }
 
     public void grabOddsShark() {
-        System.out.println( "Fetching '" + inputURIOS + "'");
+        log( "Fetching '" + inputURIOS + "'");
 
         try
         {
-            Document page = connect(inputURIOS).get();
+            Document page = connect(inputURIOS);
             Elements gamesElements = page.select("table");
 
             for (int i = 0; i < gamesElements.size(); i++) {
@@ -454,6 +454,19 @@ public class Util {
     }
 
     protected void logBadTeam(String one, String two) {
-        System.out.println("Unable to locate either " + one + " or " + two);
+        log("Unable to locate either " + one + " or " + two);
+    }
+
+    protected Document connect(String url) {
+        try {
+            return Jsoup.connect(url).timeout(0).maxBodySize(0).ignoreContentType(true).get();
+        } catch (IOException e) {
+            log("Error getting connection from: " + url);
+            return null;
+        }
+    }
+    
+    protected void log(String message) {
+        System.out.println(message);
     }
 }

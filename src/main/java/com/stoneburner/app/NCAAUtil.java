@@ -7,17 +7,23 @@ import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
 
 import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
+import static com.google.common.collect.Maps.newHashMap;
+import static com.google.common.collect.Sets.newHashSet;
+import static java.lang.Math.pow;
 import static java.lang.String.format;
+import static java.util.Arrays.asList;
 import static java.util.Locale.ENGLISH;
 import static org.joda.time.Weeks.weeksBetween;
 import static org.joda.time.format.DateTimeFormat.forPattern;
-import static org.jsoup.Jsoup.connect;
 
 public class NCAAUtil extends Util {
     private String inputSP = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTNXgxlcihtmzIbzHDsQH5CXI6aSXfsZzWB7E8IC0sf4CaMsgP_p4DRSwx6TtoektFRCL3wO5m64JLB/pubhtml";
     private String inputAtomic = "http://www.atomicfootball.com/archive/af_predictions_All.html";
     private String inputFPI = "http://www.espn.com/college-football/team/fpi/_/id/%d/";
+    private Set<String> acronymTeams = newHashSet();
 
     public NCAAUtil() {
         DateTime game1 = new DateTime(1535760000000l);
@@ -32,6 +38,8 @@ public class NCAAUtil extends Util {
         inputSagarin = format(inputSagarin, "cf");
         inputSpread = format(inputSpread, "college-football", isVegasWeek ? "las-vegas" : "offshore");
         input538 = "https://projects.fivethirtyeight.com/2018-college-football-predictions/sims.csv";
+
+        acronymTeams.addAll(asList("BYU", "LSU", "SMU", "TCU", "UAB","UCLA", "UNLV", "USC", "UTEP", "UTSA", "WKU"));
 
         teamToId.put("Air Force", 2005);
         teamToId.put("Akron", 2006);
@@ -166,50 +174,46 @@ public class NCAAUtil extends Util {
     }
 
     protected void grab538() {
-        System.out.println("Fetching '" + input538 + "'");
+        log("Fetching '" + input538 + "'");
 
         //Execute client with our method
         try {
-            HashMap<String,Integer> teams = new HashMap<String,Integer>();
+            HashMap<String,Integer> teams = newHashMap();
 
-            String[] rows = connect(input538).maxBodySize(0).get().body().html().split("(?<=(\\d|winout)[ ])");
+            String[] rows = connect(input538).body().html().split("(?<=(\\d|winout)[ ])");
 
             for (int i = 1; i < rows.length; i++) {
                 String[] rowParts = rows[i].trim().split(",");
                 String teamName = cleanTeamName(rowParts[0]);
                 int won = Integer.valueOf(rowParts[6]);
 
-                if (teams.get(teamName) == null) {
-                    teams.put(teamName, won);
-                } else {
-                    teams.put(teamName, teams.get(teamName) + won);
-                }
+                teams.merge(teamName, won, (a, b) -> a + b);
             }
-            for (String teamName : teams.keySet()) {
-                int wins = teams.get(teamName);
+            for (Map.Entry<String,Integer> entry : teams.entrySet()) {
+                int wins = entry.getValue();
                 if (wins == 0) {
                     continue;
                 }
-                Double winPct = teams.get(teamName) * 100.0 / ((rows.length-1 * 1.0) / teams.size());
+                Double winPct = entry.getValue() * 100.0 / ((rows.length-1 * 1.0) / teams.size());
                 Double spread = null;
                 if (winPct < 50.0) {
                     winPct = 100.0 - winPct;
-                    spread = Math.pow((winPct / 49.25), (1.0/.194)) * -1.0;
+                    spread = pow((winPct / 49.25), (1.0/.194)) * -1.0;
                 } else {
-                    spread = Math.pow((winPct / 49.25), (1.0/.194));
+                    spread = pow((winPct / 49.25), (1.0/.194));
                 }
 
-                Integer id = teamToId.get(teamName);
+                Integer id = teamToId.get(entry.getKey());
                 if (id != null) {
                     Game game = idToGame.get(id);
                     if (game != null) {
-                        game.setFiveThirtyEight(String.valueOf(spread * (game.getHome().equals(teamName) ? -1.0 : 1.0)));
+                        game.setFiveThirtyEight(String.valueOf(spread * (game.getHome().equals(entry.getKey()) ? -1.0 : 1.0)));
                     } else {
-                        System.out.println("No game found for " + teamName + " with a spread of " + spread);
+                        log("No game found for " + entry.getKey() + " with a spread of " + spread);
                     }
 
                 } else {
-                    System.out.println("No team found for " + teamName + " with a spread of " + spread);
+                    log("No team found for " + entry.getKey() + " with a spread of " + spread);
                 }
             }
 
@@ -219,10 +223,10 @@ public class NCAAUtil extends Util {
     }
 
     public void grabSandP() {
-        System.out.println("Fetching sAndP predictions");
+        log("Fetching sAndP predictions");
 
         try {
-            Elements rows = connect(inputSP).maxBodySize(0).get().select("table").get(1).select("tr");
+            Elements rows = connect(inputSP).select("table").get(1).select("tr");
 
             for (int i = 2; i < rows.size(); i++) {
                 Elements tds = rows.get(i).select("td");
@@ -259,10 +263,10 @@ public class NCAAUtil extends Util {
     }
 
     public void grabAtomic() {
-        System.out.println("Fetching '" + inputAtomic + "'");
+        log("Fetching '" + inputAtomic + "'");
 
         try {
-            Document page = connect(inputAtomic).get();
+            Document page = connect(inputAtomic);
             Elements rows = page.select("a[name=IA]").get(0).nextElementSibling().nextElementSibling().select("tr");
             DateTime currentDate = new DateTime();
             DateTime thisPastMonday = new DateTime().withWeekyear(currentDate.getWeekyear()).withYear(2018).withDayOfWeek(1).withHourOfDay(0);
@@ -301,11 +305,11 @@ public class NCAAUtil extends Util {
     }
 
     public void grabFPI() {
-        System.out.println("Fetching FPI predictions");
+        log("Fetching FPI predictions");
 
         games.stream().forEach(g -> {
             try {
-                Elements tables = connect(format(inputFPI, teamToId.get(g.getAway()))).maxBodySize(0).get().select("table");
+                Elements tables = connect(format(inputFPI, teamToId.get(g.getAway()))).select("table");
                 Elements gameRows = tables.get(tables.size()-1).select("tr");
 
                 for (int i = 2; i < gameRows.size(); i++) {
@@ -341,9 +345,9 @@ public class NCAAUtil extends Util {
                         Double spread = null;
                         if (winPct < 50.0) {
                             winPct = 100.0 - winPct;
-                            spread = Math.pow((winPct / 49.25), (1.0/.194)) * -1.0;
+                            spread = pow((winPct / 49.25), (1.0/.194)) * -1.0;
                         } else {
-                            spread = Math.pow((winPct / 49.25), (1.0/.194));
+                            spread = pow((winPct / 49.25), (1.0/.194));
                         }
                         ((NCAAGame)g).setFpi(String.valueOf(spread));
                         break;
@@ -359,39 +363,45 @@ public class NCAAUtil extends Util {
 
     protected String cleanTeamName(String teamName) {
         //Common cleanups
+        if (acronymTeams.contains(teamName.toUpperCase())) {
+            teamName = teamName.toUpperCase();
+        }
         return teamName.replaceAll(" St(.)?$"," State").replaceAll("^E ", "Eastern ").replaceAll("^C ", "Central ")
                 .replaceAll("&amp;","&").replaceAll("<b>","").replace("</b>","").replaceAll("i(`|')i", "ii")
                 .replaceAll("^W ", "Western ").replace("A&m", "A&M").replace(" AM"," A&M").replaceAll("\\(ucf\\)$", "")
                 //team specific cleanup
                 .replaceAll("Army West Point", "Army")
                 .replaceAll("Bowling Green State", "Bowling Green")
-                .replaceAll("(BYU|Byu)", "Brigham Young")
+                .replaceAll("BYU", "Brigham Young")
                 .replaceAll("SUNY-Buffalo", "Buffalo")
                 .replaceAll("UCF", "Central Florida")
                 .replaceAll("UNC( |-)Charlotte", "Charlotte")
                 .replaceAll("^Coastal Car$", "Coastal Carolina")
+                .replaceAll("FL Atlantic", "Florida Atlantic")
                 .replaceAll("(FIU|Florida Int(')?l|Fla. International)", "Florida International")
                 .replaceAll("Ga Southern", "Georgia Southern")
                 .replaceAll("^Kent$", "Kent State")
-                .replaceAll("^(ULM|Louisiana-([Mm])onroe|UL-Monroe)$","Louisiana Monroe")
+                .replaceAll("^(ULM|Louisiana-([Mm])onroe|UL([- ])Monroe)$","Louisiana Monroe")
                 .replaceAll("((UL|Louisiana)-([Ll])afayette|ULL)", "Louisiana")
-                .replaceAll("(Louisiana State|Lsu)", "LSU")
+                .replaceAll("Louisiana State", "LSU")
+                .replaceAll("UMass", "Massachusetts")
                 .replaceAll("(Miami( |-)(FL|florida)|^Miami$)", "Miami (FL)")
                 .replaceAll("Miami( |-)(OH|ohio)", "Miami (OH)")
                 .replaceAll("(Middle Tennessee State|MTSU)", "Middle Tennessee")
                 .replaceAll("Ole Miss", "Mississippi")
-                .replaceAll("N.C. State", "North Carolina State")
+                .replaceAll("N(\\.?)([Cc])(\\.?) State", "North Carolina State")
                 .replaceAll("N Illinois", "Northern Illinois")
                 .replaceAll("Ohio U.", "Ohio")
                 .replaceAll("SMU", "Southern Methodist")
-                .replaceAll("(Texas Christian|Tcu)", "TCU")
+                .replaceAll("Southern Mississippi", "Southern Miss")
+                .replaceAll("Texas Christian", "TCU")
                 .replaceAll("Texas St-San Marcos", "Texas State")
-                .replaceAll("(Alabama-Birmingham|Uab)", "UAB")
-                .replaceAll("(Ucla|California-Los Angeles)", "UCLA")
-                .replaceAll("(Nevada-Las Vegas|Unlv)", "UNLV")
+                .replaceAll("Alabama-Birmingham", "UAB")
+                .replaceAll("California-Los Angeles", "UCLA")
+                .replaceAll("Nevada-Las Vegas", "UNLV")
                 .replaceAll("Southern Cal(ifornia)?", "USC")
                 .replaceAll("Texas El Paso", "UTEP")
-                .replaceAll("(Texas-San Antonio|Utsa|UT San Antonio)", "UTSA")
+                .replaceAll("(Texas-San Antonio|UT San Antonio)", "UTSA")
                 .replaceAll("WKU", "Western Kentucky")
                 .trim();
     }

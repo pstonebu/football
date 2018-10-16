@@ -11,7 +11,6 @@ import static java.lang.String.format;
 import static org.apache.commons.lang3.StringUtils.isEmpty;
 import static org.joda.time.Weeks.weeksBetween;
 import static org.joda.time.format.DateTimeFormat.forPattern;
-import static org.jsoup.Jsoup.connect;
 
 public class NFLUtil extends Util {
 
@@ -95,12 +94,12 @@ public class NFLUtil extends Util {
     }
 
     protected void grab538() {
-        System.out.println( "Fetching '" + input538 + "'");
+        log( "Fetching '" + input538 + "'");
 
         //Execute client with our method
         try
         {
-            Document page = connect(input538).get();
+            Document page = connect(input538);
 
             Element week = page.select("section[class=week]").get(0);
             Elements rows = week.select("tr[class=tr]");
