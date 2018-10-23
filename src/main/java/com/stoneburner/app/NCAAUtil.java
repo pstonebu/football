@@ -379,6 +379,7 @@ public class NCAAUtil extends Util {
                 .replaceAll("UCF", "Central Florida")
                 .replaceAll("UNC( |-)Charlotte", "Charlotte")
                 .replaceAll("^Coastal Car$", "Coastal Carolina")
+                .replaceAll("UConn", "Connecticut")
                 .replaceAll("FL Atlantic", "Florida Atlantic")
                 .replaceAll("(FIU|Florida Int(')?l|Fla. International)", "Florida International")
                 .replaceAll("Ga Southern", "Georgia Southern")

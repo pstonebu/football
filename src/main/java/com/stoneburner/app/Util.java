@@ -483,9 +483,12 @@ public class Util {
     }
 
     protected boolean isCorrectGame(Game game, String expectedAway, String expectedHome) {
+        if (game == null) {
+            return false;
+        }
         String actualAway = game.getAway();
         String actualHome = game.getHome();
-        return game != null && (actualHome.equals(expectedHome) && actualAway.equals(expectedAway)) ||
+        return (actualHome.equals(expectedHome) && actualAway.equals(expectedAway)) ||
                 (actualAway.equals(expectedHome) && actualHome.equals(expectedAway));
     }
 }
