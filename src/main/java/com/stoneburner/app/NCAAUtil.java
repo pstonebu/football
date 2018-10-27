@@ -8,11 +8,12 @@ import org.jsoup.select.Elements;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
+import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.collect.Sets.newHashSet;
-import static java.lang.Math.pow;
 import static java.lang.String.format;
 import static java.util.Arrays.asList;
 import static java.util.Locale.ENGLISH;
@@ -23,6 +24,7 @@ public class NCAAUtil extends Util {
     private String inputSP = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTNXgxlcihtmzIbzHDsQH5CXI6aSXfsZzWB7E8IC0sf4CaMsgP_p4DRSwx6TtoektFRCL3wO5m64JLB/pubhtml";
     private String inputAtomic = "http://www.atomicfootball.com/archive/af_predictions_All.html";
     private String inputFPI = "http://www.espn.com/college-football/team/fpi/_/id/%d/";
+    private String inputFEI = "http://www.bcftoys.com/2018-gp/";
     private Set<String> acronymTeams = newHashSet();
 
     public NCAAUtil() {
@@ -195,14 +197,7 @@ public class NCAAUtil extends Util {
                     continue;
                 }
                 Double winPct = entry.getValue() * 100.0 / ((rows.length-1 * 1.0) / teams.size());
-                Double spread = null;
-                if (winPct < 50.0) {
-                    winPct = 100.0 - winPct;
-                    spread = pow((winPct / 49.25), (1.0/.194)) * -1.0;
-                } else {
-                    spread = pow((winPct / 49.25), (1.0/.194));
-                }
-
+                Double spread = getPredictionFromWinPct(winPct);
                 Integer id = teamToId.get(entry.getKey());
                 if (id != null) {
                     Game game = idToGame.get(id);
@@ -344,13 +339,7 @@ public class NCAAUtil extends Util {
                         continue;
                     } else if (opponent.equals(g.getHome())) {
                         Double winPct = Double.valueOf(prediction);
-                        Double spread = null;
-                        if (winPct < 50.0) {
-                            winPct = 100.0 - winPct;
-                            spread = pow((winPct / 49.25), (1.0/.194)) * -1.0;
-                        } else {
-                            spread = pow((winPct / 49.25), (1.0/.194));
-                        }
+                        Double spread = getPredictionFromWinPct(winPct);
                         g.setFpi(String.valueOf(spread));
                         break;
                     } else {
@@ -361,6 +350,31 @@ public class NCAAUtil extends Util {
                 logAndExit(e);
             }
         });
+    }
+
+    public void grabFEI() {
+        log("Fetching '" + inputFEI + "'");
+
+        try {
+            Elements rows = connect(inputFEI).select("table").get(1).select("tr");
+            rows.subList(1, rows.size()).stream().forEach(e -> {
+                Elements tds = e.select("td");
+                String winningTeam = cleanTeamName(tds.get(4).text());
+                String losingTeam = cleanTeamName(tds.get(5).text());
+                Double winPct = Double.valueOf(tds.get(3).text()) * 100.0;
+                Double prediction = getPredictionFromWinPct(winPct);
+
+                Optional<NCAAGame> match = games.stream().map(g -> {return (NCAAGame)g;}).filter(g -> isNullOrEmpty(g.getFei()) && isCorrectGame(g, winningTeam, losingTeam)).findFirst();
+                if (match.isPresent()) {
+                    NCAAGame game = match.get();
+                    game.setFei(String.valueOf(prediction * (game.getHome().equals(winningTeam) ? -1 : 1)));
+                } else {
+                    logBadTeam(winningTeam, losingTeam);
+                }
+            });
+        } catch (Exception e) {
+            logAndExit(e);
+        }
     }
 
     protected String cleanTeamName(String teamName) {
@@ -385,7 +399,7 @@ public class NCAAUtil extends Util {
                 .replaceAll("Ga Southern", "Georgia Southern")
                 .replaceAll("^Kent$", "Kent State")
                 .replaceAll("^(ULM|Louisiana-([Mm])onroe|UL([- ])Monroe)$","Louisiana Monroe")
-                .replaceAll("((UL|Louisiana)-([Ll])afayette|ULL)", "Louisiana")
+                .replaceAll("((UL|Louisiana)([ -])([Ll])afayette|ULL)", "Louisiana")
                 .replaceAll("Louisiana State", "LSU")
                 .replaceAll("UMass", "Massachusetts")
                 .replaceAll("(Miami( |-)(FL|florida)|^Miami$)", "Miami (FL)")

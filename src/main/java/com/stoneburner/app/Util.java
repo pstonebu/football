@@ -13,6 +13,7 @@ import org.jsoup.select.Elements;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -24,6 +25,7 @@ import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Maps.newHashMap;
 import static java.lang.Double.valueOf;
 import static java.lang.Math.abs;
+import static java.lang.Math.pow;
 import static java.lang.String.format;
 import static java.util.Arrays.asList;
 import static java.util.Arrays.copyOfRange;
@@ -337,15 +339,7 @@ public class Util {
                 home = teamMascotToCity.get(home);
 
                 String score = gameElement.select("span[class=wisbb_predData]").get(0).childNodes().get(0).toString();
-                ScriptEngineManager mgr = new ScriptEngineManager();
-                ScriptEngine engine = mgr.getEngineByName("JavaScript");
-                Object result = engine.eval(score);
-                double prediction;
-                if (result instanceof Integer) {
-                    prediction = (double)((Integer)result);
-                } else {
-                    prediction = (Double)result;
-                }
+                Double prediction = getDoublePredictionFromString(score);
 
                 Integer homeId = teamToId.get(home);
                 Integer awayId = teamToId.get(away);
@@ -387,15 +381,7 @@ public class Util {
                 String home = cleanTeamName(teams.get(1).text().trim());
                 String prediction = gameElement.select("td").get(1).childNode(0).toString();
 
-                ScriptEngineManager mgr = new ScriptEngineManager();
-                ScriptEngine engine = mgr.getEngineByName("JavaScript");
-                Object result = engine.eval(prediction);
-                Double margin = null;
-                if (result instanceof Integer) {
-                    margin = (double)((Integer)result);
-                } else {
-                    margin = (Double)result;
-                }
+                Double margin = getDoublePredictionFromString(prediction);
 
                 Integer homeId = teamToId.get(home);
                 Integer awayId = teamToId.get(away);
@@ -490,5 +476,33 @@ public class Util {
         String actualHome = game.getHome();
         return (actualHome.equals(expectedHome) && actualAway.equals(expectedAway)) ||
                 (actualAway.equals(expectedHome) && actualHome.equals(expectedAway));
+    }
+
+    protected Double getDoublePredictionFromString(String score) {
+        try {
+            ScriptEngineManager mgr = new ScriptEngineManager();
+            ScriptEngine engine = mgr.getEngineByName("JavaScript");
+            Object result = engine.eval(score);
+            double prediction;
+            if (result instanceof Integer) {
+                prediction = (double) ((Integer) result);
+            } else {
+                prediction = (double) result;
+            }
+            return prediction;
+        } catch (ScriptException e) {
+            return null;
+        }
+    }
+
+    protected Double getPredictionFromWinPct(double winPct) {
+        Double spread = null;
+        if (winPct < 50.0) {
+            winPct = 100.0 - winPct;
+            spread = pow((winPct / 49.25), (1.0/.194)) * -1.0;
+        } else {
+            spread = pow((winPct / 49.25), (1.0/.194));
+        }
+        return spread;
     }
 }

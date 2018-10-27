@@ -11,13 +11,14 @@ public class NCAAGame extends Game {
     private String sAndP = "";
     private String fPlus = "";
     private String fpi = "";
+    private String fei = "";
 
     public String getHeader() {
-        return "Home Team, Away Team, PR, Dratings, Fox, OS, 538, Massey, Sagarin, S&P+, F/+, Atomic, FPI, Spread";
+        return "Home Team, Away Team, PR, Dratings, Fox, OS, 538, Massey, Sagarin, S&P+, F/+, Atomic, FPI, FEI, Spread";
     }
 
     public String toString() {
         return String.join(",", asList(home, away, powerRank, dRatings, fox, oddsShark, fiveThirtyEight, massey,
-                sagarin, sAndP, fPlus, atomic, fpi, spread));
+                sagarin, sAndP, fPlus, atomic, fpi, fei, spread));
     }
 }
