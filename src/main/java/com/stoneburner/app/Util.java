@@ -201,7 +201,7 @@ public class Util {
 
                 String favorite = currentRow.substring(4, 27).trim();
                 String cleanedFavorite = removeMascot(cleanTeamName(capitalizeFully(favorite)));
-                String underdog = currentRow.substring(59).trim();
+                String underdog = currentRow.substring(59, 88).trim();
                 String cleanedUnderdog = removeMascot(cleanTeamName(capitalizeFully(underdog)));
 
                 String[] spreads = currentRow.substring(27, 59).trim().split("\\s+");
