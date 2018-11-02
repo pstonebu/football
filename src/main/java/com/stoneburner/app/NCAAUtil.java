@@ -6,13 +6,10 @@ import org.joda.time.format.DateTimeFormatter;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 import static com.google.common.base.Strings.isNullOrEmpty;
-import static com.google.common.collect.Maps.newHashMap;
 import static com.google.common.collect.Sets.newHashSet;
 import static java.lang.String.format;
 import static java.util.Arrays.asList;
@@ -39,7 +36,7 @@ public class NCAAUtil extends Util {
         inputURIOS = format(inputURIOS, "ncaaf");
         inputSagarin = format(inputSagarin, "cf");
         inputSpread = format(inputSpread, "college-football", isVegasWeek ? "las-vegas" : "offshore");
-        input538 = "https://projects.fivethirtyeight.com/2018-college-football-predictions/sims.csv";
+        input538 = "https://projects.fivethirtyeight.com/2018-college-football-predictions";
 
         acronymTeams.addAll(asList("BYU", "LSU", "SMU", "TCU", "UAB","UCLA", "UNLV", "USC", "UTEP", "UTSA", "WKU"));
 
@@ -180,38 +177,29 @@ public class NCAAUtil extends Util {
 
         //Execute client with our method
         try {
-            HashMap<String,Integer> teams = newHashMap();
+            Elements rows = connect(input538).select("table[class=forecast-table]").select("tr");
 
-            String[] rows = connect(input538).body().html().split("(?<=(\\d|winout)[ ])");
-
-            for (int i = 1; i < rows.length; i++) {
-                String[] rowParts = rows[i].trim().split(",");
-                String teamName = cleanTeamName(rowParts[0]);
-                int won = Integer.valueOf(rowParts[6]);
-
-                teams.merge(teamName, won, (a, b) -> a + b);
-            }
-            for (Map.Entry<String,Integer> entry : teams.entrySet()) {
-                int wins = entry.getValue();
-                if (wins == 0) {
-                    continue;
-                }
-                Double winPct = entry.getValue() * 100.0 / ((rows.length-1 * 1.0) / teams.size());
+            for (int i = 3; i < rows.size(); i++) {
+                Elements tds = rows.get(i).select("td");
+                String teamName = cleanTeamName(tds.select("td[class=team]").get(0).attributes().get("data-str"));
+                String nextOpponent = cleanTeamName(tds.select("td[class=next-opponent]").text());
+                String pctString = tds.select("td").select("td[class=scenario first]").get(0).attributes().get("data-val");
+                Double winPct = Double.valueOf(pctString) * 100.0;
                 Double spread = getPredictionFromWinPct(winPct);
-                Integer id = teamToId.get(entry.getKey());
-                if (id != null) {
-                    Game game = idToGame.get(id);
-                    if (game != null) {
-                        game.setFiveThirtyEight(String.valueOf(spread * (game.getHome().equals(entry.getKey()) ? -1.0 : 1.0)));
-                    } else {
-                        log("No game found for " + entry.getKey() + " with a spread of " + spread);
-                    }
 
+                Integer homeId = teamToId.get(teamName);
+                Integer awayId = teamToId.get(nextOpponent);
+                if (homeId != null && awayId != null) {
+                    Game game = idToGame.get(homeId);
+                    if (isCorrectGame(game, teamName, nextOpponent)) {
+                        game.setFiveThirtyEight(String.valueOf(spread * (game.getHome().equals(teamName) ? -1.0 : 1.0)));
+                    } else {
+                        logBadTeam(teamName, nextOpponent);
+                    }
                 } else {
-                    log("No team found for " + entry.getKey() + " with a spread of " + spread);
+                    logBadTeam(teamName, nextOpponent);
                 }
             }
-
         } catch (Exception e) {
             logAndExit(e);
         }
@@ -382,14 +370,16 @@ public class NCAAUtil extends Util {
         if (acronymTeams.contains(teamName.toUpperCase())) {
             teamName = teamName.toUpperCase();
         }
-        return teamName.replaceAll(" St(.)?$"," State").replaceAll("^E ", "Eastern ").replaceAll("^C ", "Central ")
-                .replaceAll("&amp;","&").replaceAll("<b>","").replace("</b>","").replaceAll("i(`|')i", "ii")
-                .replaceAll("^W ", "Western ").replace("A&m", "A&M").replace(" AM"," A&M").replaceAll("\\(ucf\\)$", "")
+        return teamName.replaceAll(" St(.)?$"," State").replaceAll("^E ", "Eastern ").replaceAll("^C ", "Central ").replaceAll("^Miss. ", "Mississippi ")
+                .replaceAll("&amp;","&").replaceAll("<b>","").replace("</b>","").replaceAll("i(`|')i", "ii").replaceAll("^Mich. ", "Michigan ")
+                .replaceAll("^W ", "Western ").replace("A&m", "A&M").replace(" AM"," A&M").replaceAll("\\(ucf\\)$", "").replaceAll("^S. ", "South ")
                 //team specific cleanup
                 .replaceAll("Army West Point", "Army")
+                .replaceAll("^BC$", "Boston College")
                 .replaceAll("Bowling Green State", "Bowling Green")
                 .replaceAll("BYU", "Brigham Young")
                 .replaceAll("SUNY-Buffalo", "Buffalo")
+                .replaceAll("^Cal$", "California")
                 .replaceAll("UCF", "Central Florida")
                 .replaceAll("UNC( |-)Charlotte", "Charlotte")
                 .replaceAll("^Coastal Car$", "Coastal Carolina")
@@ -400,11 +390,13 @@ public class NCAAUtil extends Util {
                 .replaceAll("^Kent$", "Kent State")
                 .replaceAll("^(ULM|Louisiana-([Mm])onroe|UL([- ])Monroe)$","Louisiana Monroe")
                 .replaceAll("((UL|Louisiana)([ -])([Ll])afayette|ULL)", "Louisiana")
+                .replaceAll("La. Tech", "Louisiana Tech")
                 .replaceAll("Louisiana State", "LSU")
                 .replaceAll("UMass", "Massachusetts")
                 .replaceAll("(Miami( |-)(FL|florida)|^Miami$)", "Miami (FL)")
                 .replaceAll("Miami( |-)(OH|ohio)", "Miami (OH)")
                 .replaceAll("(Middle Tennessee State|MTSU)", "Middle Tennessee")
+                .replaceAll("N'western", "Northwestern")
                 .replaceAll("Ole Miss", "Mississippi")
                 .replaceAll("N(\\.?)([Cc])(\\.?) State", "North Carolina State")
                 .replaceAll("N Illinois", "Northern Illinois")
@@ -419,6 +411,8 @@ public class NCAAUtil extends Util {
                 .replaceAll("Southern Cal(ifornia)?", "USC")
                 .replaceAll("Texas El Paso", "UTEP")
                 .replaceAll("(Texas-San Antonio|UT San Antonio)", "UTSA")
+                .replaceAll("Wash. State", "Washington State")
+                .replaceAll("W. Virginia", "West Virginia")
                 .replaceAll("WKU", "Western Kentucky")
                 .trim();
     }
