@@ -38,7 +38,7 @@ public class NCAAUtil extends Util {
         inputSpread = format(inputSpread, "college-football", isVegasWeek ? "las-vegas" : "offshore");
         input538 = "https://projects.fivethirtyeight.com/2018-college-football-predictions";
 
-        acronymTeams.addAll(asList("BYU", "LSU", "SMU", "TCU", "UAB","UCLA", "UNLV", "USC", "UTEP", "UTSA", "WKU"));
+        acronymTeams.addAll(asList("BYU", "LSU", "SMU", "TCU", "UAB", "UCLA", "UNLV", "USC", "UTEP", "UTSA", "WKU"));
 
         teamToId.put("Air Force", 2005);
         teamToId.put("Akron", 2006);
