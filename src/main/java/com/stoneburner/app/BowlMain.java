@@ -3,17 +3,20 @@ package com.stoneburner.app;
 public class BowlMain {
 
     public static void main( String[] args ) {
-        NCAAUtil util = new NCAAUtil();
+        NCAAUtil util = new BowlUtil();
 
         util.grabPowerRank();
+        util.grabFEI();
+        util.grabFPI();
         util.grabAtomic();
-        util.grab538();
+        //util.grab538();
         util.grabSpread();
         util.grabSagarin();
         util.grabMassey();
         util.grabSandP();
         util.grabDRatings();
-        util.grabFox();
+        //disabling fox until they prove they don't suck
+        //util.grabFox();
         util.grabOddsShark();
         util.printResults();
 

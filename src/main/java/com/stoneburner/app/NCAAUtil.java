@@ -30,7 +30,7 @@ public class NCAAUtil extends Util {
         isVegasWeek = week == 11;
         inputURIFox = format("https://www.foxsports.com/college-football/predictions?season=2018&seasonType=1&week=%d&group=-3", week);
 
-        inputMassey = format(inputMassey, "cf", forPattern("yyyyMMdd").print(today));
+        inputMassey = format(inputMasseyBlank, "cf", forPattern("yyyyMMdd").print(today));
 
         inputURIDR = format(inputURIDR, "ncaa");
         inputURIOS = format(inputURIOS, "ncaaf");
@@ -262,14 +262,19 @@ public class NCAAUtil extends Util {
                 String home = cleanTeamName(currentRowParts.get(3).childNode(0).childNode(0).toString());
                 String awayScore = currentRowParts.get(2).childNode(0).toString();
                 String homeScore = currentRowParts.get(4).childNode(0).toString();
-                String margin = String.valueOf(Integer.valueOf(awayScore) - Integer.valueOf(homeScore));
+                int margin = Integer.valueOf(awayScore) - Integer.valueOf(homeScore);
+
+                int gameYear = thisPastMonday.getYear();
+                if (date.startsWith("1/")) {
+                    gameYear++;
+                }
 
                 DateTimeFormatter format = DateTimeFormat.forPattern("MM/dd");
-                DateTime gameDate = format.withLocale(ENGLISH).parseDateTime(date).withYear(thisPastMonday.getYear()).withHourOfDay(22);
+                DateTime gameDate = format.withLocale(ENGLISH).parseDateTime(date).withYear(gameYear).withHourOfDay(22);
 
                 if (gameDate.getMillis() < thisPastMonday.getMillis()) {
                     continue;
-                } else if (gameDate.getMillis() > inAWeek.getMillis()) {
+                } else if (gameDate.getMillis() > inAWeek.getMillis() && !isBowl()) {
                     break;
                 }
 
@@ -277,8 +282,13 @@ public class NCAAUtil extends Util {
                 Integer homeId = teamToId.get(home);
                 if (awayId != null && homeId != null) {
                     NCAAGame game = (NCAAGame)idToGame.get(homeId);
+                    if (isBowl() && gameDate.isBefore(new DateTime(2018, 12,25, 0, 0))) {
+                        idToGame.remove(homeId);
+                        idToGame.remove(awayId);
+                        games.remove(game);
+                    }
                     if (isCorrectGame(game, away, home)) {
-                        game.setAtomic(margin);
+                        game.setAtomic(String.valueOf((game.getHome().equals(home) ? 1 : -1) * margin));
                     }
                 } else {
                     logBadTeam(away, home);
@@ -299,6 +309,9 @@ public class NCAAUtil extends Util {
 
                 for (int i = 2; i < gameRows.size(); i++) {
                     Elements currentGameCells = gameRows.get(i).select("td");
+                    if (currentGameCells.size() == 1) {
+                        break;
+                    }
                     String[] nextGameParts = currentGameCells.get(0).text().split("(,)? ");
                     String opponent = cleanTeamName(currentGameCells.get(1).select("li[class=team-name]").text()
                             .replaceAll("#(\\d){1,2} ", "").replace("*", ""));
@@ -308,6 +321,7 @@ public class NCAAUtil extends Util {
                     DateTime inAWeek = thisPastMonday.plusWeeks(1);
 
                     int gameMonth = 0;
+                    int gameYear = thisPastMonday.getYear();
                     if (nextGameParts[1].equals("Aug")) {
                         gameMonth = 8;
                     } else if (nextGameParts[1].equals("Sept")) {
@@ -318,11 +332,15 @@ public class NCAAUtil extends Util {
                         gameMonth = 11;
                     } else if (nextGameParts[1].equals("Dec")) {
                         gameMonth = 12;
+                    } else if (nextGameParts[1].equals("Jan")) {
+                        gameMonth = 1;
+                        gameYear++;
                     }
 
-                    DateTime gameDate = new DateTime(thisPastMonday.getYear(), gameMonth, Integer.valueOf(nextGameParts[2]), 22, 0);
+                    DateTime gameDate = new DateTime(gameYear, gameMonth, Integer.valueOf(nextGameParts[2]), 22, 0);
 
-                    if (gameDate.getMillis() < thisPastMonday.getMillis() || gameDate.getMillis() > inAWeek.getMillis() ||
+                    if (gameDate.getMillis() < thisPastMonday.getMillis() ||
+                            (gameDate.getMillis() > inAWeek.getMillis() && !isBowl()) ||
                             prediction.contains("W ") || prediction.contains("L ")) {
                         continue;
                     } else if (opponent.equals(g.getHome())) {
@@ -429,5 +447,9 @@ public class NCAAUtil extends Util {
 
     protected NCAAGame getNewGame() {
         return new NCAAGame();
+    }
+
+    protected boolean isBowl() {
+        return this instanceof BowlUtil;
     }
 }

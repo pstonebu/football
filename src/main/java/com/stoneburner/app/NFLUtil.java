@@ -18,7 +18,7 @@ public class NFLUtil extends Util {
         int week = weeksBetween(new DateTime(1536451200000l), today).getWeeks()+2;
         isVegasWeek = week == 10;
 
-        inputMassey = format(inputMassey, "nfl", forPattern("yyyyMMdd").print(today));
+        inputMassey = format(inputMasseyBlank, "nfl", forPattern("yyyyMMdd").print(today));
         inputURIDR = format(inputURIDR, "nfl");
         inputURIOS = format(inputURIOS, "nfl");
         inputURIFox = "http://www.foxsports.com/nfl/predictions";

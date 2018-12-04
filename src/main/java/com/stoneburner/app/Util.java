@@ -42,9 +42,11 @@ public class Util {
     protected String inputURIOS = "https://www.oddsshark.com/%s/computer-picks";
     protected String inputURIFox = "";
     protected String inputSagarin = "http://sagarin.com/sports/%ssend.htm";
-    protected String inputMassey = "http://www.masseyratings.com/predjson.php?s=%s&sub=11604&dt=%s";
+    protected String inputMasseyBlank = "http://www.masseyratings.com/predjson.php?s=%s&sub=11604&dt=%s";
+    protected String inputMassey = "";
     protected String inputSpread = "http://www.vegasinsider.com/%s/odds/%s/2/";
     protected String input538 = "";
+    protected String sagarinPredictionQuery = "a[name=Predictions]";
 
     protected HashMap<String,String> teamMascotToCity = newHashMap();
     protected HashMap<String,Integer> teamToId = newHashMap();
@@ -54,6 +56,14 @@ public class Util {
     protected DateTime today = new DateTime();
     protected boolean isVegasWeek = false;
 
+    public Element getPowerRankCurrent(Document page) {
+        Element leagueHeader = page.select("h2").stream()
+                .filter(e -> e.toString().contains(isNfl() ? "NFL" : "College Football"))
+                .findFirst()
+                .orElse(null);
+        return leagueHeader.nextElementSibling();
+    }
+
     public void grabPowerRank() {
         log( "Fetching '" + inputURIPR + "'");
         int numGames = 0;
@@ -61,12 +71,7 @@ public class Util {
         //Execute client with our method
         try
         {
-            Document page = connect(inputURIPR);
-            Element leagueHeader = page.select("h2").stream()
-                    .filter(e -> e.toString().contains(isNfl() ? "NFL" : "College Football"))
-                    .findFirst()
-                    .orElse(null);
-            Element current = leagueHeader.nextElementSibling();
+            Element current = getPowerRankCurrent(connect(inputURIPR));
 
             while (current.nextElementSibling() != null) {
                 current = current.nextElementSibling();
@@ -188,7 +193,7 @@ public class Util {
         try
         {
             Document page = connect(inputSagarin);
-            Node predictionSection = page.select("a[name=Predictions]").get(0).parent().parent().parent().childNode(2);
+            Node predictionSection = page.select(sagarinPredictionQuery).get(0).parent().parent().parent().childNode(2);
             String[] rows = copyOfRange(predictionSection.toString().split("\r\n"), 7,
                     predictionSection.toString().split("\r\n").length);
 
