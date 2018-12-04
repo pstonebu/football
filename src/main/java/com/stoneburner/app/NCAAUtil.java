@@ -401,6 +401,8 @@ public class NCAAUtil extends Util {
                 .replaceAll("N(\\.?)([Cc])(\\.?) State", "North Carolina State")
                 .replaceAll("N Illinois", "Northern Illinois")
                 .replaceAll("Ohio U.", "Ohio")
+                .replaceAll("Okla. State", "Oklahoma State")
+                .replaceAll("SDSU", "San Diego State")
                 .replaceAll("SMU", "Southern Methodist")
                 .replaceAll("Southern Mississippi", "Southern Miss")
                 .replaceAll("Texas Christian", "TCU")

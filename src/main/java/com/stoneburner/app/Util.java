@@ -189,7 +189,7 @@ public class Util {
         {
             Document page = connect(inputSagarin);
             Node predictionSection = page.select("a[name=Predictions]").get(0).parent().parent().parent().childNode(2);
-            String[] rows = copyOfRange(predictionSection.toString().split("\r\n"), 8,
+            String[] rows = copyOfRange(predictionSection.toString().split("\r\n"), 7,
                     predictionSection.toString().split("\r\n").length);
 
             //iterate through list of games
@@ -284,8 +284,7 @@ public class Util {
 
         try
         {
-            Document page = connect(inputURIDR);
-            Elements rows = page.select("table[class=small-text]").get(isNfl() ? 0 : 1).select("tr");
+            Elements rows = connect(inputURIDR).select("table[class=small-text]").get(isNfl() ? 0 : 1).select("tr");
 
             for (int i = 2; i < rows.size(); i = i + 2) {
                 Element rowOne = rows.get(i);
