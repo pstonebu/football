@@ -448,8 +448,4 @@ public class NCAAUtil extends Util {
     protected NCAAGame getNewGame() {
         return new NCAAGame();
     }
-
-    protected boolean isBowl() {
-        return this instanceof BowlUtil;
-    }
 }

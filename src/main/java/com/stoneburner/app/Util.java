@@ -417,8 +417,12 @@ public class Util {
         return null;
     }
 
-    protected Boolean isNfl() {
+    protected boolean isNfl() {
         return this instanceof NFLUtil;
+    }
+
+    protected boolean isBowl() {
+        return this instanceof BowlUtil;
     }
 
     protected <T extends Game> T getNewGame() {
@@ -427,7 +431,7 @@ public class Util {
 
     public void printResults() {
         try {
-            File file = new File(format("/Users/patrick.stoneburner/Desktop/%s_picks.csv", isNfl() ? "nfl" : "ncaa"));
+            File file = new File(format("/Users/patrick.stoneburner/Desktop/%s_picks.csv", isNfl() ? "nfl" : isBowl() ? "bowl" : "ncaa"));
             if (!file.exists()) {
                 file.createNewFile();
             }
