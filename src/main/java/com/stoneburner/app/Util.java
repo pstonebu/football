@@ -27,6 +27,7 @@ import static java.lang.Double.valueOf;
 import static java.lang.Math.abs;
 import static java.lang.Math.pow;
 import static java.lang.String.format;
+import static java.lang.Thread.sleep;
 import static java.util.Arrays.asList;
 import static java.util.Arrays.copyOfRange;
 import static java.util.stream.Collectors.toList;
@@ -46,7 +47,7 @@ public class Util {
     protected String inputMassey = "";
     protected String inputSpread = "http://www.vegasinsider.com/%s/odds/%s/2/";
     protected String input538 = "";
-    protected String sagarinPredictionQuery = "a[name=Predictions]";
+    protected String sagarinPredictionQuery = "a[name=Predictions_with_Totals]";
 
     protected HashMap<String,String> teamMascotToCity = newHashMap();
     protected HashMap<String,Integer> teamToId = newHashMap();
@@ -75,7 +76,7 @@ public class Util {
 
             while (current.nextElementSibling() != null) {
                 current = current.nextElementSibling();
-                if (!current.tagName().equals("p")) {
+                if (!current.tagName().equals("p") && !current.className().equals("wp-block-image")) {
                     break;
                 } else if (!current.child(0).tagName().equals("strong")) {
                     continue;
@@ -467,8 +468,9 @@ public class Util {
         try {
             return Jsoup.connect(url).timeout(0).maxBodySize(0).ignoreContentType(true).get();
         } catch (IOException e) {
-            log("Error getting connection from: " + url);
-            return null;
+            log("Error getting connection from: " + url + ". Trying again in one second.");
+            try { sleep(1000); } catch (InterruptedException ex) { }
+            return connect(url);
         }
     }
     

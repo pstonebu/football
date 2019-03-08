@@ -11,11 +11,11 @@ public class BowlUtil extends NCAAUtil {
 
     public BowlUtil() {
         sagarinPredictionQuery = "a[name=Predictions_with_Totals]";
-        inputMassey = format(inputMasseyBlank, "cf", forPattern("yyyyMMdd").print(new DateTime(2018, 12, 26, 0, 0)));
+        inputMassey = format(inputMasseyBlank, "cf", forPattern("yyyyMMdd").print(new DateTime(2018, 12, 31, 0, 0)));
     }
 
     @Override
     public Element getPowerRankCurrent(Document page) {
-        return page.select("h3").first();
+        return super.getPowerRankCurrent(page);
     }
 }
