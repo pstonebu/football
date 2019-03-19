@@ -43,7 +43,7 @@ public class Util {
     protected String inputURIOS = "https://www.oddsshark.com/%s/computer-picks";
     protected String inputURIFox = "";
     protected String inputSagarin = "http://sagarin.com/sports/%ssend.htm";
-    protected String inputMasseyBlank = "http://www.masseyratings.com/predjson.php?s=%s&sub=11604&dt=%s";
+    protected String inputMasseyBlank = "https://www.masseyratings.com/predjson.php?s=%s&sub=11604&dt=%s";
     protected String inputMassey = "";
     protected String inputSpread = "http://www.vegasinsider.com/%s/odds/%s/2/";
     protected String input538 = "";
@@ -134,7 +134,7 @@ public class Util {
                 Element current = rows.get(i);
                 String cssQuery = new StringBuilder("a[href$=#").append(isVegasWeek ? "E" : "BU").append("]").toString();
                 Elements fiveDimes = current.select(cssQuery);
-                if (fiveDimes.size() == 0) {
+                if (fiveDimes.size() == 0 || current.toString().contains("TBA")) {
                     //if this is just an info row or there's no spread posted, move on
                     continue;
                 }
@@ -426,13 +426,17 @@ public class Util {
         return this instanceof BowlUtil;
     }
 
+    protected boolean isMarchMadness() {
+        return this instanceof NCAABBallUtil;
+    }
+
     protected <T extends Game> T getNewGame() {
         return null;
     }
 
     public void printResults() {
         try {
-            File file = new File(format("/Users/patrick.stoneburner/Desktop/%s_picks.csv", isNfl() ? "nfl" : isBowl() ? "bowl" : "ncaa"));
+            File file = new File(format("/Users/patrick.stoneburner/Desktop/%s_picks.csv", isMarchMadness() ? "march_madness" : isNfl() ? "nfl" : isBowl() ? "bowl" : "ncaa"));
             if (!file.exists()) {
                 file.createNewFile();
             }
