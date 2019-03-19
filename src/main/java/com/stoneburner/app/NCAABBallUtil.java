@@ -48,9 +48,6 @@ public class NCAABBallUtil extends Util {
             pRHeader = "something";
         }
 
-        round = 1;
-        pRHeader = "Round of 64 games.";
-
         inputMassey1 = format(inputMasseyBlank, "cb", forPattern("yyyyMMdd").print(firstGame.plusDays(round == 0 ?
                 0 : round == 1 ? 2 : round == 2 ? 4 : round == 3 ? 9 : round == 4 ? 11 : round == 5 ? 16 : 18)));
         inputMassey2 = format(inputMasseyBlank, "cb", forPattern("yyyyMMdd").print(firstGame.plusDays(round == 0 ?
@@ -233,11 +230,11 @@ public class NCAABBallUtil extends Util {
                 if (round == 0) {
                     Elements tds = tables.get(i).select("tr").select("td");
                     teamOne = cleanTeamName(tds.get(0).select("div").get(2).text());
-                    winPct = Double.valueOf(tds.get(0).select("div").get(4).text().replace("%", "")) / 100.0;
-
                     NCAABBallGame game = (NCAABBallGame)idToGame.get(teamToId.get(teamOne));
                     if (game != null && isEmpty(game.getKenPom())) {
-
+                        winPct = Double.valueOf(tds.get(0).select("div").get(4).text().replace("%", "")) / 100.0;
+                        boolean teamIsFavorite = teamOne.equals(game.getHome());
+                        game.setKenPom(String.valueOf(teamIsFavorite ? winPct : (1.0-winPct)));
                     }
                 } else if (round == 1) {
                     for (int j = 0; j < 16; j = j+2) {
@@ -298,9 +295,9 @@ public class NCAABBallUtil extends Util {
             Elements rows = connect(torvik).select("tbody").get(0).select("tr");
             for (Element row : rows) {
                 String teamName = cleanTeamName(row.select("td").get(2).text());
-                Double winPct = Double.valueOf(row.select("td").get(4 + round).text()) / 100.0;
                 NCAABBallGame game = (NCAABBallGame)idToGame.get(teamToId.get(teamName));
                 if (game != null && isEmpty(game.getTorvik())) {
+                    Double winPct = Double.valueOf(row.select("td").get(4 + round).text()) / 100.0;
                     boolean teamIsFavorite = teamName.equals(game.getHome());
                     game.setTorvik(String.valueOf(teamIsFavorite ? winPct : (1.0-winPct)));
                 }
@@ -420,7 +417,7 @@ public class NCAABBallUtil extends Util {
         return teamName.replaceAll(" St(.)?$"," State").replaceAll("^E ", "Eastern ").replaceAll("^C ", "Central ").replaceAll("^Miss. ", "Mississippi ")
                 .replaceAll("&amp;","&").replaceAll("<b>","").replace("</b>","").replaceAll("i(`|')i", "ii").replaceAll("^Mich. ", "Michigan ")
                 .replaceAll("^W ", "Western ").replace("A&m", "A&M").replace(" AM"," A&M").replaceAll("\\(ucf\\)$", "").replaceAll("^S\\. ", "South ")
-                .replaceAll(" (CA)", "").replaceAll(" (NY)", "").replaceAll("’", "'")
+                .replaceAll(" (CA)", "").replaceAll(" (NY)", "").replaceAll("’", "'").replaceAll("^N ", "North ")
                 //team specific cleanup
                 .replaceAll("Army West Point", "Army")
                 .replaceAll("^BC$", "Boston College")
@@ -468,6 +465,7 @@ public class NCAABBallUtil extends Util {
                 .replace("Prairie View A&M", "Prairie View")
                 .replace("St. John's (NY)", "St John's")
                 .replace("St. John's", "St John's")
+                .replace("St. Johns", "St John's")
                 .replace("St. Louis", "Saint Louis")
                 .replace("St Louis", "Saint Louis")
                 .replace("St Mary's", "Saint Mary's")
@@ -479,6 +477,7 @@ public class NCAABBallUtil extends Util {
                 .replace("N Kentucky", "Northern Kentucky")
                 .replaceAll("^Abilene Chr$", "Abilene Christian")
                 .replace("Lsu", "LSU")
+                .replace("NC Central", "North Carolina Central")
                 .trim();
     }
 
