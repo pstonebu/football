@@ -364,13 +364,13 @@ public class NCAABBallUtil extends Util {
                         boolean teamIsFavorite = teamName.equals(game.getHome());
                         Double winPct = current.getJSONArray(10).getDouble(0) / 100.0;
                         game.setMassey(String.valueOf(teamIsFavorite ? winPct : (1.0-winPct)));
-                        DateTime firstSessionCutoff = new DateTime(gameDate).withHourOfDay(14).withMinuteOfHour(0);
+                        DateTime firstSessionCutoff = new DateTime(gameDate).withHourOfDay(14).withMinuteOfHour(41);
                         DateTime secondSessionCutoff = new DateTime(gameDate).withHourOfDay(17).withMinuteOfHour(0);
                         DateTime thirdSessionCutoff = new DateTime(gameDate).withHourOfDay(20).withMinuteOfHour(0);
                         game.setSession(gameDate.dayOfWeek().getAsText() +
-                                (gameDate.getMillis() <= firstSessionCutoff.getMillis() ? " 1st" :
-                                 gameDate.getMillis() <= secondSessionCutoff.getMillis() ? " 2nd" :
-                                 gameDate.getMillis() <= thirdSessionCutoff.getMillis() ? " 3rd" : " 4th"));
+                                (gameDate.isBefore(firstSessionCutoff) ? " 1st" :
+                                 gameDate.isBefore(secondSessionCutoff) ? " 2nd" :
+                                 gameDate.isBefore(thirdSessionCutoff) ? " 3rd" : " 4th"));
                     }
                 }
             }
