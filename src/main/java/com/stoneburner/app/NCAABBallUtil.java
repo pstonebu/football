@@ -1,7 +1,7 @@
 package com.stoneburner.app;
 
+import org.apache.commons.math3.distribution.NormalDistribution;
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.jsoup.nodes.Document;
@@ -10,27 +10,25 @@ import org.jsoup.nodes.Node;
 import org.jsoup.select.Elements;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.HashMap;
 
-import static java.lang.Double.valueOf;
+import static com.google.common.collect.Maps.newHashMap;
 import static java.lang.String.format;
+import static java.util.Arrays.asList;
 import static java.util.Arrays.copyOfRange;
-import static org.apache.commons.lang3.StringUtils.isBlank;
-import static org.apache.commons.lang3.StringUtils.isEmpty;
-import static org.apache.commons.lang3.StringUtils.isNotEmpty;
+import static org.apache.commons.lang3.StringUtils.*;
 import static org.apache.commons.text.StringEscapeUtils.unescapeHtml4;
 import static org.apache.commons.text.WordUtils.capitalizeFully;
 import static org.joda.time.DateTime.now;
 import static org.joda.time.DateTimeZone.forID;
 import static org.joda.time.format.DateTimeFormat.forPattern;
-import static java.util.Arrays.asList;
 
 public class NCAABBallUtil extends Util {
 
     private int round = 0;
     private String pRHeader = "";
     private DateTime firstGame = new DateTime(2019, 3, 19, 16, 40, 0);
-    private String kenPom = "https://gamepredict.us/bracket";
+    private String kenPom = "https://kenpom.com/";
     private String gp = "https://gamepredict.us/games?date=%s&league=ncb";
     private String torvik = "http://barttorvik.com/tourneytime.php";
     private String inputMassey1 = "";
@@ -40,7 +38,7 @@ public class NCAABBallUtil extends Util {
 
         if (now().isBefore(firstGame)) {
             pRHeader = "First Four Games";
-        } else if (now().isBefore(firstGame.plusDays(2).withHourOfDay(9))) {
+        } else if (now().isBefore(firstGame.plusDays(2).withHourOfDay(9)) || true) {
             round = 1;
             pRHeader = "Round of 64 games.";
         } else if (now().isBefore(firstGame.plusDays(4).withHourOfDay(9))) {
@@ -219,36 +217,36 @@ public class NCAABBallUtil extends Util {
     public void grabKenPom() {
         log("Fetching '" + kenPom + "'");
 
+        HashMap<String, Elements> teamToRow = newHashMap();
         //Execute client with our method
         try {
-            Elements tables = connect(kenPom).select("table[class=bracket-table]");
-            boolean isFirstRound = round == 0;
-
-            for (int i = isFirstRound ? 0 : 4; i < (isFirstRound ? 4 : 8); i++) {
-                Double winPct = null;
-                String teamOne = null;
-                if (round == 0) {
-                    Elements tds = tables.get(i).select("tr").select("td");
-                    teamOne = cleanTeamName(tds.get(0).select("div").get(2).text());
-                    NCAABBallGame game = (NCAABBallGame)idToGame.get(teamToId.get(teamOne));
-                    if (game != null && isEmpty(game.getKenPom())) {
-                        winPct = Double.valueOf(tds.get(0).select("div").get(4).text().replace("%", "")) / 100.0;
-                        boolean teamIsFavorite = teamOne.equals(game.getHome());
-                        game.setKenPom(String.valueOf(teamIsFavorite ? winPct : (1.0-winPct)));
-                    }
-                } else if (round == 1) {
-                    for (int j = 0; j < 16; j = j+2) {
-                        Elements rowDivs = tables.get(i).select("tr").get(j).select("div").get(0).select("div");
-                        teamOne = cleanTeamName(rowDivs.get(2).text());
-                        winPct = Double.valueOf(rowDivs.get(3).text().replace("%", "")) / 100.0;
-                        NCAABBallGame game = (NCAABBallGame)idToGame.get(teamToId.get(teamOne));
-                        if (game != null && isEmpty(game.getKenPom())) {
-                            boolean teamIsFavorite = teamOne.equals(game.getHome());
-                            game.setKenPom(String.valueOf(teamIsFavorite ? winPct : (1.0-winPct)));
-                        }
-                    }
+            Elements teamRows = connect(kenPom).select("tr[class=tourney], tr[class=tourney bold-bottom]");
+            for (Element tourneyTeam : teamRows) {
+                Elements tds = tourneyTeam.select("td");
+                String teamName = cleanTeamName(tds.get(1).select("a").text());
+                if (teamToId.containsKey(teamName)) {
+                    teamToRow.put(teamName, tds);
+                } else {
+                    log("Didn't match: " + teamName);
                 }
             }
+
+            games.parallelStream()
+                    .map(NCAABBallGame.class::cast)
+                    .filter(g -> !isNotEmpty(g.getKenPom()))
+                    .forEach(g -> {
+                        Elements favorite = teamToRow.get(g.getHome());
+                        Elements underdog = teamToRow.get(g.getAway());
+                        if (favorite != null && underdog != null) {
+                            Double adjEmFav = Double.valueOf(favorite.get(4).text().substring(1));
+                            Double adjEmUnd = Double.valueOf(underdog.get(4).text().substring(1));
+                            Double adjTempoFav = Double.valueOf(favorite.get(9).text());
+                            Double adjTempoUnd = Double.valueOf(underdog.get(9).text());
+                            Double pointDiff = (adjEmFav - adjEmUnd) * (adjTempoFav + adjTempoUnd) / 200.0;
+                            double winPct = (1.0 - new NormalDistribution(pointDiff, 11.0).cumulativeProbability(0));
+                            g.setKenPom(String.valueOf(winPct));
+                        } 
+            });
         } catch (Exception e) {
             logAndExit(e);
         }
@@ -297,9 +295,13 @@ public class NCAABBallUtil extends Util {
                 String teamName = cleanTeamName(row.select("td").get(2).text());
                 NCAABBallGame game = (NCAABBallGame)idToGame.get(teamToId.get(teamName));
                 if (game != null && isEmpty(game.getTorvik())) {
-                    Double winPct = Double.valueOf(row.select("td").get(4 + round).text()) / 100.0;
-                    boolean teamIsFavorite = teamName.equals(game.getHome());
-                    game.setTorvik(String.valueOf(teamIsFavorite ? winPct : (1.0-winPct)));
+                    try {
+                        Double winPct = Double.valueOf(row.select("td").get(4 + round).text()) / 100.0;
+                        boolean teamIsFavorite = teamName.equals(game.getHome());
+                        game.setTorvik(String.valueOf(teamIsFavorite ? winPct : (1.0-winPct)));
+                    } catch (NumberFormatException e) {
+                        log("Game was probably already played: " + game.getHome() + " vs. " + game.getAway());
+                    }
                 }
             }
         } catch (Exception e) {
@@ -349,10 +351,16 @@ public class NCAABBallUtil extends Util {
                     String teamName = cleanTeamName(current.getJSONArray(2).getString(0));
                     NCAABBallGame game = (NCAABBallGame)idToGame.get(teamToId.get(teamName));
                     if (game != null && isEmpty(game.getMassey())) {
-                        DateTime gameDate = forPattern("MM.dd.yyyy hh:mma").parseDateTime(
-                                current.getJSONArray(0).getString(0).substring(4) +
-                                ".2019 " + current.getJSONArray(1).getString(0).substring(0, 7).trim())
-                                .withZoneRetainFields(forID("America/New_York"));
+                        DateTime gameDate = null;
+                        try {
+                            gameDate = forPattern("MM.dd.yyyy hh:mma").parseDateTime(
+                                    current.getJSONArray(0).getString(0).substring(4) +
+                                            ".2019 " + current.getJSONArray(1).getString(0).substring(0, 7).trim())
+                                    .withZoneRetainFields(forID("America/New_York"));
+                        } catch (IllegalArgumentException | StringIndexOutOfBoundsException e) {
+                            log("Something messed up with the input date: " + e);
+                            continue;
+                        }
                         boolean teamIsFavorite = teamName.equals(game.getHome());
                         Double winPct = current.getJSONArray(10).getDouble(0) / 100.0;
                         game.setMassey(String.valueOf(teamIsFavorite ? winPct : (1.0-winPct)));
