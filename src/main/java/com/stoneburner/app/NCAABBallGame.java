@@ -14,12 +14,12 @@ public class NCAABBallGame extends Game {
     private String session;
 
     public String getHeader() {
-        return "Favorite, Underdog, 538, PR, KP, GP, Torvik, Massey, DRatings, Sagarin, Spread" + (playIn ? "" : ", Session");
+        return "Favorite, Underdog, 538, PR, KP, GP, Torvik, Massey, DRatings, Sagarin, " + (playIn ? "" : "Session, " + "Spread");
     }
 
     public String toString() {
         return String.join(",", playIn ?
                 asList(home, away, fiveThirtyEight, powerRank, kenPom, gamePredict, torvik, massey, dRatings, sagarin, spread) :
-                asList(home, away, fiveThirtyEight, powerRank, kenPom, gamePredict, torvik, massey, dRatings, sagarin, spread, session));
+                asList(home, away, fiveThirtyEight, powerRank, kenPom, gamePredict, torvik, massey, dRatings, sagarin, session, spread));
     }
 }
