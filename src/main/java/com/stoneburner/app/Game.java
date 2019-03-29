@@ -11,6 +11,7 @@ public class Game {
     protected String home = "";
     protected String away = "";
     protected String spread = "";
+    protected String overunder = "";
     protected String fiveThirtyEight = "";
     protected String powerRank = "";
     protected String sagarin = "";

@@ -33,6 +33,8 @@ public class NCAABBallUtil extends Util {
     private String torvik = "http://barttorvik.com/tourneytime.php";
     private String inputMassey1 = "";
     private String inputMassey2 = "";
+    private Double kenPomAverageTempo = 67.796;
+    private Double kenPomAverageO = 104.393;
 
     public NCAABBallUtil() {
 
@@ -44,7 +46,8 @@ public class NCAABBallUtil extends Util {
         } else if (now().isBefore(firstGame.plusDays(4).withHourOfDay(9))) {
             round = 2;
             pRHeader = "Games on Sunday, March 24, 2019.";
-        } else if (now().isBefore(firstGame.plusDays(9).withHourOfDay(15))) {
+            //} else if (now().isBefore(firstGame.plusDays(9).withHourOfDay(15))) {
+        } else {
             round = 3;
             pRHeader = "Sweet 16 games.";
         }
@@ -243,11 +246,18 @@ public class NCAABBallUtil extends Util {
                         if (favorite != null && underdog != null) {
                             Double adjEmFav = Double.valueOf(favorite.get(4).text().substring(1));
                             Double adjEmUnd = Double.valueOf(underdog.get(4).text().substring(1));
+                            Double adjustedOFav = Double.valueOf(favorite.get(5).text());
+                            Double adjustedDFav = Double.valueOf(favorite.get(7).text());
+                            Double adjustedOUnd = Double.valueOf(underdog.get(5).text());
+                            Double adjustedDUnd = Double.valueOf(underdog.get(7).text());
                             Double adjTempoFav = Double.valueOf(favorite.get(9).text());
                             Double adjTempoUnd = Double.valueOf(underdog.get(9).text());
                             Double pointDiff = (adjEmFav - adjEmUnd) * (adjTempoFav + adjTempoUnd) / 200.0;
                             double winPct = (1.0 - new NormalDistribution(pointDiff, 11.0).cumulativeProbability(0));
                             g.setKenPom(String.valueOf(winPct));
+                            double totalPoints = (((adjustedOFav + adjustedDUnd - kenPomAverageO) + (adjustedOUnd + adjustedDFav - kenPomAverageO))
+                                    * (adjTempoFav + adjTempoUnd - kenPomAverageTempo)) / 100.0;
+                            g.setKenPomOU(String.valueOf(totalPoints));
                         } 
             });
         } catch (Exception e) {
@@ -331,6 +341,7 @@ public class NCAABBallUtil extends Util {
                     boolean teamIsFavorite = teamName.equals(game.getHome());
                     Double winPct = Double.valueOf(tds.get(4).text().replace("%","")) / 100.0;
                     game.setDRatings(String.valueOf(teamIsFavorite ? winPct : (1.0-winPct)));
+                    game.setDRatingsOU(tds.get(6).text());
                 }
             }
         }
@@ -371,6 +382,7 @@ public class NCAABBallUtil extends Util {
                         boolean teamIsFavorite = teamName.equals(game.getHome());
                         Double winPct = current.getJSONArray(10).getDouble(0) / 100.0;
                         game.setMassey(String.valueOf(teamIsFavorite ? winPct : (1.0-winPct)));
+                        game.setMasseyOU(String.valueOf(current.getJSONArray(14).getDouble(0)));
                         DateTime firstSessionCutoff = new DateTime(gameDate).withHourOfDay(14).withMinuteOfHour(41);
                         DateTime secondSessionCutoff = new DateTime(gameDate).withHourOfDay(17).withMinuteOfHour(0);
                         DateTime thirdSessionCutoff = new DateTime(gameDate).withHourOfDay(20).withMinuteOfHour(0);
@@ -411,6 +423,7 @@ public class NCAABBallUtil extends Util {
                     boolean teamIsFavorite = cleanedFavorite.equals(game.getHome());
                     Double winPct = Double.valueOf(currentRow.substring(86, 89).trim()) / 100.0;
                     game.setSagarin(String.valueOf(teamIsFavorite ? winPct : (1.0-winPct)));
+                    game.setSagarinOU(currentRow.substring(92).trim());
                 }
             }
         }

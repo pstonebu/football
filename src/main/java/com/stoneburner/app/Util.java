@@ -150,17 +150,20 @@ public class Util {
 
                 boolean teamOneIsFavorite;
                 Double spread = null;
+                Double overunder = null;
                 if (spreadParts.get(0).startsWith("-")) {
                     teamOneIsFavorite = true;
                     if (isNotEmpty(spreadParts.get(0)) && !spreadParts.get(0).equals(" ")) {
                         String spreadString = spreadParts.get(0).split("-|\\+|EV")[1].replace("½", ".5").replace(" EV", "");
                         spread = abs(valueOf(spreadString.substring(0, spreadString.length() - 1)));
+                        overunder = Double.valueOf(spreadParts.get(1).replace("½",".5").split("u")[0]);
                     }
                 } else {
                     teamOneIsFavorite = false;
                     if (isNotEmpty(spreadParts.get(1)) && !spreadParts.get(1).equals(" ")) {
                         String spreadString = spreadParts.get(1).split("-|\\+|EV")[1].replace("½", ".5").replace(" EV", "");
                         spread = abs(valueOf(spreadString.substring(0, spreadString.length() - 1)));
+                        overunder = Double.valueOf(spreadParts.get(0).replace("½",".5").split("u")[0]);
                     }
                 }
 
@@ -175,6 +178,7 @@ public class Util {
                             } else if (game.getAway().equals(teamOne)) {
                                 game.setSpread(String.valueOf((teamOneIsFavorite ? 1.0 : -1.0) * spread));
                             }
+                            game.setOverunder(String.valueOf(overunder));
                         }
                     } else {
                         logBadTeam(teamOne, teamTwo);
