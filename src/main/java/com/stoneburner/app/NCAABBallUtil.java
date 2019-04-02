@@ -46,10 +46,15 @@ public class NCAABBallUtil extends Util {
         } else if (now().isBefore(firstGame.plusDays(4).withHourOfDay(9))) {
             round = 2;
             pRHeader = "Games on Sunday, March 24, 2019.";
-            //} else if (now().isBefore(firstGame.plusDays(9).withHourOfDay(15))) {
-        } else {
+        } else if (now().isBefore(firstGame.plusDays(9).withHourOfDay(15))) {
             round = 3;
             pRHeader = "Sweet 16 games.";
+        } else if (now().isBefore(firstGame.plusDays(11).withHourOfDay(15))) {
+            round = 4;
+            pRHeader = "Elite 8 games.";
+        } else {
+            round = 5;
+            pRHeader = "Final Four";
         }
 
         inputMassey1 = format(inputMasseyBlank, "cb", forPattern("yyyyMMdd").print(firstGame.plusDays(round == 0 ?
@@ -275,6 +280,10 @@ public class NCAABBallUtil extends Util {
             urls = new ArrayList<String>(asList(format(gp, forPattern("yyyyMMdd").print(firstGame.plusDays(4))), format(gp, forPattern("yyyyMMdd").print(firstGame.plusDays(5)))));
         } else if (round == 3) {
             urls = new ArrayList<String>(asList(format(gp, forPattern("yyyyMMdd").print(firstGame.plusDays(9))), format(gp, forPattern("yyyyMMdd").print(firstGame.plusDays(10)))));
+        } else if (round == 4) {
+            urls = new ArrayList<String>(asList(format(gp, forPattern("yyyyMMdd").print(firstGame.plusDays(11))), format(gp, forPattern("yyyyMMdd").print(firstGame.plusDays(12)))));
+        } else if (round == 5) {
+            urls = new ArrayList<String>(asList(format(gp, forPattern("yyyyMMdd").print(firstGame.plusDays(18)))));
         }
 
         for (String url : urls) {

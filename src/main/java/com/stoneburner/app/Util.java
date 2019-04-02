@@ -163,7 +163,7 @@ public class Util {
                     if (isNotEmpty(spreadParts.get(1)) && !spreadParts.get(1).equals(" ")) {
                         String spreadString = spreadParts.get(1).split("-|\\+|EV")[1].replace("½", ".5").replace(" EV", "");
                         spread = abs(valueOf(spreadString.substring(0, spreadString.length() - 1)));
-                        overunder = Double.valueOf(spreadParts.get(0).replace("½",".5").split("u")[0]);
+                        overunder = Double.valueOf(spreadParts.get(0).replace("½",".5").split("(u|o)")[0]);
                     }
                 }
 
