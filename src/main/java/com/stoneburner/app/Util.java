@@ -45,7 +45,8 @@ public class Util {
     protected String inputSagarin = "http://sagarin.com/sports/%ssend.htm";
     protected String inputMasseyBlank = "https://www.masseyratings.com/predjson.php?s=%s&sub=11604&dt=%s";
     protected String inputMassey = "";
-    protected String inputSpread = "http://www.vegasinsider.com/%s/odds/%s/2/";
+    //TODO if 5Dimes comes back, need to look on page 2
+    protected String inputSpread = "http://www.vegasinsider.com/%s/odds/%s/";
     protected String input538 = "";
     protected String sagarinPredictionQuery = "a[name=Predictions_with_Totals]";
 
@@ -76,9 +77,9 @@ public class Util {
 
             while (current.nextElementSibling() != null) {
                 current = current.nextElementSibling();
-                if (!current.tagName().equals("p") && !current.className().equals("wp-block-image")) {
+                if (!current.tagName().equals("p") && !current.className().equals("wp-block-image") && !current.tagName().equals("h3")) {
                     break;
-                } else if (!current.child(0).tagName().equals("strong")) {
+                } else if (current.children().size() == 0 || !current.child(0).tagName().equals("strong")) {
                     continue;
                 }
 
@@ -132,9 +133,10 @@ public class Util {
 
             for (int i = 0; i < rows.size(); i++) {
                 Element current = rows.get(i);
-                String cssQuery = new StringBuilder("a[href$=#").append(isVegasWeek ? "E" : "BU").append("]").toString();
-                Elements fiveDimes = current.select(cssQuery);
-                if (fiveDimes.size() == 0 || current.toString().contains("TBA")) {
+                //TODO if 5Dimes comes back, second E needs to be BU
+                String cssQuery = new StringBuilder("a[href$=#").append(isVegasWeek ? "E" : "E").append("]").toString();
+                Elements casinoSpread = current.select(cssQuery);
+                if (casinoSpread.size() == 0 || current.toString().contains("TBA")) {
                     //if this is just an info row or there's no spread posted, move on
                     continue;
                 }
@@ -160,10 +162,12 @@ public class Util {
                     }
                 } else {
                     teamOneIsFavorite = false;
-                    if (isNotEmpty(spreadParts.get(1)) && !spreadParts.get(1).equals(" ")) {
+                    if (isNotEmpty(spreadParts.get(1)) && !spreadParts.get(1).equals(" ") && !spreadParts.get(1).equals("  ")) {
                         String spreadString = spreadParts.get(1).split("-|\\+|EV")[1].replace("½", ".5").replace(" EV", "");
                         spread = abs(valueOf(spreadString.substring(0, spreadString.length() - 1)));
-                        overunder = Double.valueOf(spreadParts.get(0).replace("½",".5").split("(u|o)")[0]);
+                        if (!spreadParts.get(0).equals(" ")) {
+                            overunder = Double.valueOf(spreadParts.get(0).replace("½",".5").split("(u|o)")[0]);
+                        }
                     }
                 }
 
@@ -199,7 +203,7 @@ public class Util {
         {
             Document page = connect(inputSagarin);
             Node predictionSection = page.select(sagarinPredictionQuery).get(0).parent().parent().parent().childNode(2);
-            String[] rows = copyOfRange(predictionSection.toString().split("\r\n"), 7,
+            String[] rows = copyOfRange(predictionSection.toString().split("\r\n"), 8,
                     predictionSection.toString().split("\r\n").length);
 
             //iterate through list of games
@@ -211,7 +215,7 @@ public class Util {
 
                 String favorite = currentRow.substring(4, 27).trim();
                 String cleanedFavorite = removeMascot(cleanTeamName(capitalizeFully(favorite)));
-                String underdog = currentRow.substring(59, 88).trim();
+                String underdog = currentRow.substring(59, 80).trim();
                 String cleanedUnderdog = removeMascot(cleanTeamName(capitalizeFully(underdog)));
 
                 String[] spreads = currentRow.substring(27, 59).trim().split("\\s+");
@@ -294,7 +298,7 @@ public class Util {
 
         try
         {
-            Elements rows = connect(inputURIDR).select("table[class=small-text]").get(isNfl() ? 0 : 1).select("tr");
+            Elements rows = connect(inputURIDR).select("table[class=small-text]").get(isNfl() ? 0 : 0).select("tr");
 
             for (int i = 2; i < rows.size(); i = i + 2) {
                 Element rowOne = rows.get(i);
@@ -379,7 +383,7 @@ public class Util {
 
             for (int i = 0; i < gamesElements.size(); i++) {
                 Element gameElement = gamesElements.get(i);
-                Elements teams = gameElement.getElementsByClass("name-long");
+                Elements teams = gameElement.getElementsByClass("table__name-long");
                 if (teams.size() != 2) {
                     continue;
                 }
@@ -498,8 +502,8 @@ public class Util {
 
     protected Double getDoublePredictionFromString(String score) {
         try {
-            ScriptEngineManager mgr = new ScriptEngineManager();
-            ScriptEngine engine = mgr.getEngineByName("JavaScript");
+            @SuppressWarnings("removal")
+            ScriptEngine engine = new ScriptEngineManager().getEngineByName("JavaScript");
             Object result = engine.eval(score);
             double prediction;
             if (result instanceof Integer) {

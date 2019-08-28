@@ -9,11 +9,11 @@ public class NCAAMain {
         util.grabFEI();
         util.grabFPI();
         util.grabAtomic();
-        util.grab538();
+        //util.grab538();
         util.grabSpread();
         util.grabSagarin();
         util.grabMassey();
-        util.grabSandP();
+        //util.grabSandP();
         util.grabDRatings();
         //disabling fox until they prove they don't suck
         //util.grabFox();

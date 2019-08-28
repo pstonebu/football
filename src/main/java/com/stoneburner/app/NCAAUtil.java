@@ -21,7 +21,7 @@ public class NCAAUtil extends Util {
     private String inputSP = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTNXgxlcihtmzIbzHDsQH5CXI6aSXfsZzWB7E8IC0sf4CaMsgP_p4DRSwx6TtoektFRCL3wO5m64JLB/pubhtml";
     private String inputAtomic = "http://www.atomicfootball.com/archive/af_predictions_All.html";
     private String inputFPI = "http://www.espn.com/college-football/team/fpi/_/id/%d/";
-    private String inputFEI = "http://www.bcftoys.com/2018-gp/";
+    private String inputFEI = "http://www.bcftoys.com/2019-gp/";
     private Set<String> acronymTeams = newHashSet();
 
     public NCAAUtil() {
@@ -35,7 +35,7 @@ public class NCAAUtil extends Util {
         inputURIDR = format(inputURIDR, "ncaa");
         inputURIOS = format(inputURIOS, "ncaaf");
         inputSagarin = format(inputSagarin, "cf");
-        inputSpread = format(inputSpread, "college-football", isVegasWeek ? "las-vegas" : "offshore");
+        inputSpread = format(inputSpread, "college-football", isVegasWeek ? "las-vegas" : "global");
         input538 = "https://projects.fivethirtyeight.com/2018-college-football-predictions";
 
         acronymTeams.addAll(asList("BYU", "LSU", "SMU", "TCU", "UAB", "UCLA", "UNLV", "USC", "UTEP", "UTSA", "WKU"));
@@ -362,13 +362,14 @@ public class NCAAUtil extends Util {
         log("Fetching '" + inputFEI + "'");
 
         try {
-            Elements rows = connect(inputFEI).select("table").get(1).select("tr");
+            Elements rows = connect(inputFEI).select("table").get(0).select("tr");
             rows.subList(1, rows.size()).stream().forEach(e -> {
                 Elements tds = e.select("td");
-                String winningTeam = cleanTeamName(tds.get(4).text());
-                String losingTeam = cleanTeamName(tds.get(5).text());
-                Double winPct = Double.valueOf(tds.get(3).text()) * 100.0;
-                Double prediction = getPredictionFromWinPct(winPct);
+                String winningTeam = cleanTeamName(tds.get(0).text());
+                String losingTeam = cleanTeamName(tds.get(1).text());
+                //Double winPct = Double.valueOf(tds.get(6).text()) * 100.0;
+                //Double prediction = getPredictionFromWinPct(winPct);
+                Double prediction = Double.valueOf(tds.get(7).text());
 
                 Optional<NCAAGame> match = games.stream().map(g -> {return (NCAAGame)g;}).filter(g -> isNullOrEmpty(g.getFei()) && isCorrectGame(g, winningTeam, losingTeam)).findFirst();
                 if (match.isPresent()) {
