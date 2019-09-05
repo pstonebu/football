@@ -502,8 +502,7 @@ public class Util {
 
     protected Double getDoublePredictionFromString(String score) {
         try {
-            @SuppressWarnings("removal")
-            ScriptEngine engine = new ScriptEngineManager().getEngineByName("JavaScript");
+            ScriptEngine engine = new ScriptEngineManager().getEngineByName("graal.js");
             Object result = engine.eval(score);
             double prediction;
             if (result instanceof Integer) {
