@@ -24,7 +24,7 @@ public class NFLUtil extends Util {
         inputURIFox = "http://www.foxsports.com/nfl/predictions";
         inputSagarin = format(inputSagarin, "nfl");
         inputSpread = format(inputSpread, "nfl", isVegasWeek ? "las-vegas" : "offshore");
-        input538 = "https://projects.fivethirtyeight.com/2018-nfl-predictions/games/";
+        input538 = "https://projects.fivethirtyeight.com/2019-nfl-predictions/games/";
 
         teamMascotToCity.put("Titans","Tennessee");
         teamMascotToCity.put("Jaguars","Jacksonville");

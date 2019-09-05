@@ -14,7 +14,7 @@ public class NCAAGame extends Game {
     private String fei = "";
 
     public String getHeader() {
-        return "Home Team, Away Team, PR, Dratings, Fox, OS, 538, Massey, Sagarin, S&P+, F/+, Atomic, FPI, FEI, Spread";
+        return "Home Team, Away Team, PR, Dratings, Fox, OS, 538, Massey, Sagarin, SP+, F/+, Atomic, FPI, FEI, Spread";
     }
 
     public String toString() {

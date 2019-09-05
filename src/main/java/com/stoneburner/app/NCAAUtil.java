@@ -362,7 +362,7 @@ public class NCAAUtil extends Util {
         log("Fetching '" + inputFEI + "'");
 
         try {
-            Elements rows = connect(inputFEI).select("table").get(0).select("tr");
+            Elements rows = connect(inputFEI).select("table").get(1).select("tr");
             rows.subList(1, rows.size()).stream().forEach(e -> {
                 Elements tds = e.select("td");
                 String winningTeam = cleanTeamName(tds.get(0).text());
