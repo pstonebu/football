@@ -1,5 +1,6 @@
-package com.stoneburner.app;
+package com.stoneburner.app.bowl;
 
+import com.stoneburner.app.ncaa.NCAAUtil;
 import org.joda.time.DateTime;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;

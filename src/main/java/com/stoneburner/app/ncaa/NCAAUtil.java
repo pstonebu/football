@@ -1,5 +1,7 @@
-package com.stoneburner.app;
+package com.stoneburner.app.ncaa;
 
+import com.stoneburner.app.Game;
+import com.stoneburner.app.Util;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;

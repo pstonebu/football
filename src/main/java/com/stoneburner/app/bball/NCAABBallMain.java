@@ -1,4 +1,4 @@
-package com.stoneburner.app;
+package com.stoneburner.app.bball;
 
 public class NCAABBallMain {
 

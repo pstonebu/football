@@ -1,4 +1,4 @@
-package com.stoneburner.app;
+package com.stoneburner.app.nfl;
 
 public class NFLMain
 {

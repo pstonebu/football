@@ -1,5 +1,7 @@
-package com.stoneburner.app;
+package com.stoneburner.app.nfl;
 
+import com.stoneburner.app.Game;
+import com.stoneburner.app.Util;
 import org.joda.time.DateTime;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;

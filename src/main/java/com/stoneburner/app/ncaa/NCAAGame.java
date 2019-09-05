@@ -1,5 +1,6 @@
-package com.stoneburner.app;
+package com.stoneburner.app.ncaa;
 
+import com.stoneburner.app.Game;
 import lombok.Getter;
 import lombok.Setter;
 

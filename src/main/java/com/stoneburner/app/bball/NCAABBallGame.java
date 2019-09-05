@@ -1,5 +1,6 @@
-package com.stoneburner.app;
+package com.stoneburner.app.bball;
 
+import com.stoneburner.app.Game;
 import lombok.Getter;
 import lombok.Setter;
 

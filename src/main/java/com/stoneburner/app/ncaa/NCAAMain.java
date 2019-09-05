@@ -1,9 +1,9 @@
-package com.stoneburner.app;
+package com.stoneburner.app.ncaa;
 
-public class BowlMain {
+public class NCAAMain {
 
     public static void main( String[] args ) {
-        NCAAUtil util = new BowlUtil();
+        NCAAUtil util = new NCAAUtil();
 
         util.grabPowerRank();
         util.grabFEI();
@@ -13,7 +13,7 @@ public class BowlMain {
         util.grabSpread();
         util.grabSagarin();
         util.grabMassey();
-        util.grabSandP();
+        //util.grabSandP();
         util.grabDRatings();
         //disabling fox until they prove they don't suck
         //util.grabFox();
