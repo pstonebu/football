@@ -14,8 +14,6 @@
   <name>538</name>
   <url>http://maven.apache.org</url>
   <properties>
-    <httpclient.version>4.5.9</httpclient.version>
-    <joda.version>2.10.3</joda.version>
     <math.version>3.6.1</math.version>
     <text.version>1.7</text.version>
     <json.version>20190722</json.version>
@@ -40,7 +38,7 @@
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
     </dependency>
-    
+
     <!-- Other dependencies -->
     <dependency>
       <groupId>org.apache.commons</groupId>
