@@ -17,7 +17,7 @@
     <math.version>3.6.1</math.version>
     <text.version>1.8</text.version>
     <json.version>20190722</json.version>
-    <jsoup.version>1.12.1</jsoup.version>
+    <jsoup.version>1.15.3</jsoup.version>
     <java.version>11</java.version>
     <guava.version>28.1-jre</guava.version>
     <graal.version>19.2.0</graal.version>
